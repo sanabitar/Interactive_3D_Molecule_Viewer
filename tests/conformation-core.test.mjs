@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {eligibleBonds,movingSide,rotateBond,projectionBasis,newmanBranches} from '../src/core/conformation-core.mjs';
+const atoms=[[-1,0,0,'C'],[1,0,0,'C'],[-2,1,0,'H'],[-2,-.5,.866,'H'],[-2,-.5,-.866,'H'],[2,-1,0,'H'],[2,.5,.866,'H'],[2,.5,-.866,'H']].map(([x,y,z,el])=>({x,y,z,el}));
+const bonds=[[0,1],[0,2],[0,3],[0,4],[1,5],[1,6],[1,7]],orders=bonds.map(()=>1);
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
+test('ethane has exactly one eligible axis and separated moving side',()=>{const e=eligibleBonds(atoms,bonds,orders);assert.equal(e.length,1);assert.deepEqual(new Set(e[0].moving),new Set([1,5,6,7]));});
+test('rotation preserves axis, fixed fragment and all bond lengths without mutating input',()=>{const before=JSON.stringify(atoms),r=rotateBond(atoms,0,1,[1,5,6,7],60);for(let i=0;i<5;i++)assert.deepEqual(r[i],atoms[i]);for(const [a,b] of bonds)assert.ok(Math.abs(dist(r[a],r[b])-dist(atoms[a],atoms[b]))<1e-10);assert.notDeepEqual(r[5],atoms[5]);assert.equal(JSON.stringify(atoms),before);});
+test('360 degrees restores coordinates',()=>{const r=rotateBond(atoms,0,1,[1,5,6,7],360);r.forEach((a,i)=>assert.ok(dist(a,atoms[i])<1e-10));});
+test('rings, double bonds and amide bonds are excluded',()=>{assert.equal(movingSide(3,[[0,1],[1,2],[2,0]],0,1),null);assert.equal(eligibleBonds(atoms,bonds,[2,...orders.slice(1)]).length,0);const a=[{el:'O'},{el:'C'},{el:'N'},{el:'C'}];assert.equal(eligibleBonds(a,[[0,1],[1,2],[2,3]],[2,1,1]).length,0);});
+test('Newman front branches stay fixed and rear branches rotate 60 degrees',()=>{const basis=projectionBasis(atoms,0,1),a=newmanBranches(atoms,bonds,0,1,basis),r=rotateBond(atoms,0,1,[1,5,6,7],60),b=newmanBranches(r,bonds,0,1,basis);assert.equal(a.length,6);a.forEach((p,i)=>{let delta=Math.atan2(Math.sin(b[i].angle-p.angle),Math.cos(b[i].angle-p.angle));assert.ok(Math.abs(Math.abs(delta)-(p.side?Math.PI/3:0))<1e-9);});});

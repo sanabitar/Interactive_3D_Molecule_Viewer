@@ -1,0 +1,10 @@
+// Pins every number quoted in the "Try it" examples of the tool descriptions, so the help text cannot drift from the code.
+import test from 'node:test';import assert from 'node:assert/strict';
+import {peptide} from '../src/core/build.mjs';import {phiPsi,ramaSummary,caContactMap,compareStructures,alignGlobal} from '../src/core/analysis.mjs';import {molProps} from '../src/core/properties.mjs';
+const M=a=>({...a,element:a.el,resName:a.res,resSeq:a.resi,iCode:'',hetero:false}),helix=()=>peptide(12,{phi:-57,psi:-47}).map(M),strand=()=>peptide(12,{phi:-120,psi:130}).map(M);
+const band=A=>{const m=caContactMap(A,'A',8);let w=0,pairs=0;for(let i=0;i<m.n;i++)for(let j=0;j<m.n;j++)if(m.matrix[i*m.n+j]){w=Math.max(w,Math.abs(i-j));if(j>i)pairs++}return{w,pairs}};
+test('Try it / Ramachandran: helix model 10/10 in the alpha region, strand model 10/10 in the beta/PPII region',()=>{assert.deepEqual(ramaSummary(phiPsi(helix())).counts,{alphaR:10,beta:0,alphaL:0,other:0,gly:0});assert.deepEqual(ramaSummary(phiPsi(strand())).counts,{alphaR:0,beta:10,alphaL:0,other:0,gly:0})});
+test('Try it / Contact map: helix band reaches |i-j|=4 (38 pairs), strand band |i-j|=2 (21 pairs) at 8 A',()=>{assert.deepEqual(band(helix()),{w:4,pairs:38});assert.deepEqual(band(strand()),{w:2,pairs:21})});
+test('Try it / RMSD: helix vs strand is 6.7 A over 12 CA pairs; a model against itself is 0',()=>{const r=compareStructures(helix(),strand(),{chainA:'A',chainB:'A'});assert.equal(r.nPairs,12);assert.equal(r.rmsd.toFixed(1),'6.7');assert.ok(compareStructures(helix(),helix(),{chainA:'A',chainB:'A'}).rmsd<1e-9)});
+test('Try it / Alignment: ACGT vs AGT has 3 identical columns of 4 (75%)',()=>{const a=alignGlobal('ACGT','AGT');assert.equal([a.identical,a.length,a.identityPct].join(),'3,4,75')});
+test('Try it / Compare: water 18.015 g/mol vs methane 16.043 g/mol',()=>{const w=molProps([{element:'O',x:0,y:0,z:0},{element:'H',x:.757,y:.586,z:0},{element:'H',x:-.757,y:.586,z:0}]),m=molProps([{element:'C',x:0,y:0,z:0},...[1,2,3,4].map(i=>({element:'H',x:i,y:0,z:0}))]);assert.equal(w.molecularWeight.toFixed(3),'18.015');assert.equal(m.molecularWeight.toFixed(3),'16.043')});

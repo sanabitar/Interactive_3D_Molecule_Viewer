@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {alignGlobal,chainSequence,phiPsi,caContactMap} from '../src/core/analysis.mjs';
+test('alignment: identical, hand-computed gap case, errors',()=>{const r=alignGlobal('ACDEF','ACDEF');assert.equal(r.identityPct,100);assert.equal(r.score,10);
+ const g=alignGlobal('ACGT','AGT');assert.equal(g.a,'ACGT');assert.equal(g.b,'A-GT');assert.equal(g.score,4);assert.equal(g.identical,3);assert.equal(g.identityPct,75);assert.equal(g.coverageA,.75);assert.equal(g.coverageB,1);assert.equal(g.gaps,1);
+ assert.throws(()=>alignGlobal('','A'),RangeError);assert.throws(()=>alignGlobal('A1','A'),RangeError);assert.equal(alignGlobal('ac gt','ACGT').identityPct,100)});
+const at=(chain,resSeq,resName,name,x,y,z,iCode='')=>({chain,resSeq,iCode,resName,name,x,y,z,hetero:false});
+test('chain sequence uses residue identity incl. insertion codes; excludes ligands',()=>{const A=[at('A',1,'SER','CA',0,0,0),at('A',1,'SER','N',1,0,0),at('A',1,'GLY','CA',5,0,0,'A'),at('A',2,'XYZ','CA',9,0,0),{...at('A',3,'LIG','C1',0,0,0),hetero:true}];assert.equal(chainSequence(A,'A'),'SGX')});
+test('phi/psi on constructed backbone (trans phi=180, cis psi=0)',()=>{const A=[at('A',1,'ALA','C',-.5,1.2,0),at('A',2,'ALA','N',0,0,0),at('A',2,'ALA','CA',1.46,0,0),at('A',2,'ALA','C',2.0,-1.2,0),at('A',3,'ALA','N',.8,-1.74,0)];
+ const r=phiPsi(A);assert.equal(r.length,1);assert.ok(Math.abs(Math.abs(r[0].phi)-180)<1e-6);assert.ok(Math.abs(r[0].psi)<1e-6);
+ A[4].x=40;assert.equal(phiPsi(A).length,0,'chain break excluded')});
+test('contact map thresholds',()=>{const A=[0,5,20].map((x,i)=>at('A',i+1,'ALA','CA',x,0,0)),M=caContactMap(A,'A',8);assert.equal(M.n,3);assert.equal(M.matrix[1],1);assert.equal(M.matrix[2],0);assert.equal(M.matrix[0],1);assert.throws(()=>caContactMap(A,'A',0),RangeError);assert.throws(()=>caContactMap(A,'B'),/No CA/)});

@@ -1,0 +1,15 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {superpose} from '../src/core/superpose.mjs';import {compareStructures} from '../src/core/analysis.mjs';
+const rot=(p,k,t)=>{const L=Math.hypot(...k),u=k.map(v=>v/L),c=Math.cos(t),s=Math.sin(t),d=u[0]*p.x+u[1]*p.y+u[2]*p.z,cr=[u[1]*p.z-u[2]*p.y,u[2]*p.x-u[0]*p.z,u[0]*p.y-u[1]*p.x];
+ return{x:p.x*c+cr[0]*s+u[0]*d*(1-c),y:p.y*c+cr[1]*s+u[1]*d*(1-c),z:p.z*c+cr[2]*s+u[2]*d*(1-c)}};
+const P=[[0,0,0],[3.8,0,0],[3.8,3.8,0],[7.6,3.8,3.8],[2,-1,5],[-3,2,1]].map(([x,y,z])=>({x,y,z}));
+test('superpose recovers a known rotation+translation (RMSD ~ 0)',()=>{const Q=P.map(p=>{const r=rot(p,[1,2,3],.7);return{x:r.x+10,y:r.y-4,z:r.z+2.5}});const s=superpose(P,Q);assert.ok(s.rmsd<1e-9,'rmsd '+s.rmsd);assert.ok(s.rmsdFromEigenvalue<1e-6);
+ const d=s.rotation,det=d[0][0]*(d[1][1]*d[2][2]-d[1][2]*d[2][1])-d[0][1]*(d[1][0]*d[2][2]-d[1][2]*d[2][0])+d[0][2]*(d[1][0]*d[2][1]-d[1][1]*d[2][0]);assert.ok(Math.abs(det-1)<1e-9,'proper rotation')});
+test('superpose analytic case: stretched collinear set, RMSD = sqrt(2/3)',()=>{const A=[-1,0,1].map(x=>({x,y:0,z:0})),B=[-2,0,2].map(x=>({x,y:0,z:0}));const s=superpose(A,B);assert.ok(Math.abs(s.rmsd-Math.sqrt(2/3))<1e-9);assert.ok(Math.abs(s.rmsdFromEigenvalue-Math.sqrt(2/3))<1e-6)});
+test('superpose does not use reflections and validates input',()=>{const M=P.map(p=>({x:-p.x,y:p.y,z:p.z}));assert.ok(superpose(P,M).rmsd>0.5,'mirror image cannot be matched by rotation');assert.throws(()=>superpose(P.slice(0,2),P.slice(0,2)),RangeError);assert.throws(()=>superpose(P,P.slice(1)),RangeError)});
+const ca=(n,res,pts)=>pts.map((p,i)=>({chain:n,resSeq:i+1,iCode:'',resName:res[i],name:'CA',element:'C',hetero:false,...p}));
+test('compareStructures: CA pairing via alignment, rigid copy and gapped copy',()=>{const R=['ALA','GLY','SER','LEU'],A=ca('A',R,P.slice(0,4)),mv=p=>{const r=rot(p,[0,0,1],Math.PI/2);return{x:r.x+5,y:r.y+1,z:r.z-2}};
+ const B=ca('B',R,P.slice(0,4).map(mv));let r=compareStructures(A,B,{chainA:'A',chainB:'B'});assert.equal(r.nPairs,4);assert.ok(r.rmsd<1e-9);assert.equal(r.alignment.identityPct,100);
+ const B2=ca('B',['ALA','SER','LEU'],[0,2,3].map(i=>mv(P[i])));r=compareStructures(A,B2,{chainA:'A',chainB:'B'});assert.equal(r.nPairs,3);assert.ok(r.rmsd<1e-9);assert.equal(r.alignment.coverageA,.75);assert.equal(r.alignment.coverageB,1);
+ B[2]={...B[2],resName:'TRP'};r=compareStructures(A,B,{chainA:'A',chainB:'B',identicalOnly:true});assert.equal(r.nPairs,3,'mismatch excluded');
+ assert.equal(compareStructures(A,B,{mode:'ord'}).nPairs,4);assert.throws(()=>compareStructures(A,B.map((a,i)=>i?a:{...a,element:'N'}),{mode:'ord'}),/identical heavy-atom/);assert.throws(()=>compareStructures(A.slice(0,2),B,{chainA:'A',chainB:'B'}),/at least 3/)});

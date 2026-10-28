@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {hillFormula,molProps} from '../src/core/properties.mjs';
+const A=(...e)=>e.map((el,i)=>({el,element:el,x:i,y:0,z:0}));const close=(a,b,t,m)=>assert.ok(Math.abs(a-b)<t,`${m}: ${a} vs ${b}`);
+test('Hill formula ordering',()=>{assert.equal(hillFormula(A('O','H','H')).formula,'H2O');assert.equal(hillFormula(A('N','H','H','H')).formula,'H3N','no carbon: alphabetical');
+ assert.equal(hillFormula(A('C','O','O')).formula,'CO2');assert.equal(hillFormula(A('O','C','H','H','H','H','H','H','C')).formula,'C2H6O');assert.equal(hillFormula(A('C','C','O')).formula,'C2O');assert.equal(hillFormula(A('S','C','H','N')).formula,'CHNS')});
+test('molecular weight from standard atomic weights (hand-computed)',()=>{close(molProps(A('O','H','H')).molecularWeight,18.015,1e-9,'water');close(molProps(A('C','H','H','H','H')).molecularWeight,16.043,1e-9,'methane');
+ close(molProps(A(...'CCCCCC'.split(''),...'HHHHHH'.split(''))).molecularWeight,78.114,1e-9,'benzene');const u=molProps(A('C','X'));assert.equal(u.molecularWeight,null);assert.deepEqual(u.unknownElements,['X'])});
+test('radius of gyration, extent and flags',()=>{const P=[{element:'C',x:-1,y:0,z:0},{element:'C',x:1,y:0,z:0}];let p=molProps(P);close(p.radiusOfGyration,1,1e-12,'rg equal masses');assert.equal(p.extent.x,2);assert.equal(p.rgMassWeighted,true);assert.equal(p.hydrogensLikelyMissing,true);
+ p=molProps([{element:'C',x:0,y:0,z:0},{element:'H',x:3.024,y:0,z:0}]);close(p.radiusOfGyration,Math.sqrt(12.011*1.008*3.024**2/(13.019**2)),1e-9,'mass-weighted two-body: m1*m2*d^2/M^2');assert.equal(p.hydrogensLikelyMissing,false);
+ const q=molProps([{element:'C',x:0,y:0,z:0},{element:'X',x:2,y:0,z:0}]);assert.equal(q.rgMassWeighted,false);close(q.radiusOfGyration,1,1e-12,'unweighted fallback');assert.throws(()=>molProps([]),RangeError)});
+test('residue and chain counts',()=>{const R=[{chain:'A',resSeq:1,iCode:'',resName:'ALA',element:'C',x:0,y:0,z:0},{chain:'A',resSeq:1,iCode:'A',resName:'GLY',element:'C',x:1,y:0,z:0},{chain:'B',resSeq:1,iCode:'',resName:'SER',element:'N',x:2,y:0,z:0},{chain:'A',resSeq:5,iCode:'',resName:'LIG',hetero:true,element:'O',x:3,y:0,z:0}];
+ const p=molProps(R);assert.equal(p.residues,3);assert.equal(p.chains,2)});
