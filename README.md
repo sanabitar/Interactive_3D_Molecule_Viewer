@@ -11,7 +11,7 @@
 **Shim mode (default):** the browser tests replace Three.js with `tests/browser/three_shim.js` when no CDN is reachable. DOM/CSS/JS/logic are real; 3D rendering, picking and GPU memory are **not** exercised.
 Run with `--real-cdn` on a networked machine for the real engine. **Still required externally:** run `import_molecule.py` inside Blender; test with real RCSB fixtures.
 
-## v1.8 layout
+## v1.9 layout
 ```
 laura-viewer.html    viewer (project root: viewer_parity reads it)
 src/core/            pure logic (parsers, analysis, labs' cores, layout2d.mjs = 2D structure diagrams)
