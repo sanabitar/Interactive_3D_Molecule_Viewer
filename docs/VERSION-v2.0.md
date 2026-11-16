@@ -1,0 +1,45 @@
+# LAURA v2.0: summary of changes since v1.9
+
+v2.0 covers two things: hydrogens (a proper Show hydrogens option and complete hydrogens in every built-in molecule) and element symbols drawn directly on the atom spheres. The version number is for this summary only and does not appear anywhere in the app.
+
+## 1. Hydrogen visualization
+- **Display Options:** a new section at the top of the right-hand panel holds **Show hydrogens**, **Element labels**, Solvent and Bond orders. (Labels for selected atoms and Selected only stay in Analysis.)
+- **Hidden by default, one click to show.** The checkbox, the **H button** above the molecule and the **H key** are one switch; the 2D dialog follows it too. The choice carries over when you load another molecule and is saved in sessions (old sessions load with hydrogens hidden).
+- **Shown:** every hydrogen is an individual white sphere joined by a bond to its parent atom (radius follows the van der Waals radius, 1.2 Å against 1.7 Å for carbon, so it is 0.30 against 0.43 in ball-and-stick). One colour is used for H everywhere (3D, 2D, compare).
+- **Hiding never deletes:** hidden hydrogens are only left out of the picture. They stay in the structure: atom counts, the details panel ("hydrogens: 6"), formula, mass, sessions, exports and the labs all still include them. A browser test checks this.
+- **2D diagram:** hydrogens on = bonded `H` atoms; off = written on the atom (`OH`, `H₂N–`, `SH`, `NH₃⁺`, with subscripts), with N⁺ and carboxylate O⁻ drawn correctly.
+
+## Built-in molecules: hydrogens added and verified (all 43)
+- **Added to 14 small molecules:** glycine, alanine (neutral), serine, cysteine, valine (NH₂ and COOH), ethanol (OH), acetic acid, phenol (OH), toluene, aniline (NH₂), urea, acetone, pyridine, imidazole. Water was already H₂O.
+- **Added to the 11 idealised peptide models:** each is a free peptide with neutral ends: NH₂ N-terminus, COOH C-terminus (an OXT atom is added), amide N-H, Cα-H (two for Gly), Cβ as CH₃. Ala₁₂ is now C₃₆H₆₂N₁₂O₁₃, exactly twelve alanines minus eleven waters, 123 atoms (61 heavy + 62 H). Side chains still stop at Cβ (capped like alanine) and proline has no ring, as before.
+- **B-DNA** is the only exception: it is a schematic model of P and X pseudo-atoms, so there are no real atoms to protonate. It says so (details panel, and a message when you turn hydrogens on).
+- Hydrogens are generated from a heavy-atom skeleton with explicit Kekulé bond orders (`src/core/hydrogens.mjs`, `addHydrogens`; `addPeptideHydrogens` for the peptides): the number follows from valence (C 4, N 3, O 2, S 2), the direction from hybridisation, with standard X-H lengths and staggered rotors. Heavy-atom coordinates, and the L configuration of the amino acids, are unchanged. Positions are idealised, not energy-minimised.
+- **Verification (`tests/library.test.mjs`):** the 31 small molecules are compared with an independent SMILES description (separate mini-parser) for hydrogen count, bond count and the neighbours of every atom; the 11 peptides are checked residue by residue (formula and the connectivity of every N, CA, C, O, CB, OXT); and all are checked for X-H bond lengths and clashes. The oracle was mutation-tested (wrong SMILES fail). A test also requires every one of the 43 entries to be covered.
+
+## 2. Element symbols on the atom spheres
+- **On by default** (Element labels in Display Options). The symbol (C, N, O, H, S, Cl, ...) is written on its sphere in a contrasting colour (dark on light atoms, white on dark ones), so nothing has to be clicked to identify an atom. Labels do not intercept the mouse, so atoms can still be clicked, selected and measured.
+- **Readable while rotating and zooming:** each symbol is scaled to the sphere's projected size (9-26 px). A symbol appears once its sphere is about 9 px in radius (and stays until it shrinks below 7 px), so **zooming in reveals more labels** and zooming out removes ones that would be unreadable.
+- **No clutter in large molecules:** atoms are visited nearest first; an atom whose centre is hidden behind a nearer sphere gets no symbol; a symbol that would overlap one already placed is dropped; at most 250 are drawn. Not drawn in Chains view (no spheres) or for structures over 8,000 visible atoms.
+- **No flicker (fixed in this revision).** Measured on the helix models while orbiting at 1 degree per frame, 6-10% of the labels appeared or vanished every frame. Causes and fixes: labels competing for the same spot flipped with every small movement (now: a label must be wanted for 4 frames to appear and unwanted for 12 to go, labels shown last frame outrank new ones, and the on/off size thresholds differ); font sizes changed in whole-pixel steps and every label was repositioned with `left`/`top` (now: one DOM node per atom, moved and scaled with `transform` only, so sizes change smoothly and no layout is redone per frame); labels vanished instantly (now they fade out). Churn is now about 2% per frame. Real, lasting overlaps still change the label set, just a fraction of a second later.
+- The separate **Labels** option (atom names on selected atoms) is unchanged.
+
+## 3. Details panel
+- **Closed by default**, every time the page loads (the open/closed state is no longer remembered; panel widths still are).
+- **One small panel icon at the top right of the viewer** (the icon from your screenshot) opens and closes it. It stays visible while the panel is open (highlighted, tooltip "Close details panel", `aria-expanded` set). The old "x" inside the panel was removed so there is one control, not two.
+
+## 4. View: Ball and stick or Chains
+- The style dropdown is replaced by **one small icon button** at the top left of the viewer that toggles between **Ball and stick** and **Chains**. Space filling, Stick, Wireframe and the Backbone style are gone.
+- **"Chains"** is the existing tube trace through each chain's CA/P atoms (it already labelled "Chain A/B" and selected whole chains on click). If a structure has no chain of at least 4 CA/P atoms (small molecules), choosing Chains explains why and stays on Ball and stick. Structures over 400 atoms open in Chains view when they have a chain; over 40,000 atoms switch to it for speed.
+- Old session files still load: stick, wireframe and space-filling become Ball and stick; backbone and tube become Chains.
+
+## Project
+- New `src/core/hydrogens.mjs`; `src/core/layout2d.mjs` gained explicit-H placement, label text and charge helpers; `src/core/session.mjs` has the new `elements` setting and the hydrogens-off default.
+- `node tools/build_viewer.mjs` writes the inlined copies of `hydrogens.mjs` and `layout2d.mjs` into the viewer (between `/*HYDROGENS-BEGIN*/` and `/*LAYOUT2D-BEGIN*/` markers). Run it after editing either file.
+- **Tests:** 159 Node tests pass (58 new). The browser suite has 54 of 59 passing, with new or rewritten cases 44, 50-59 and updates to 02, 04, 36, 39, 41, 43. The browser tests open the details panel first (it starts closed); test 57 covers the closed default.
+
+## Limits
+- **3D rendering could not be exercised here:** the browser suite runs on a Three.js stand-in, so the label *logic* (which symbols, where, how big, overlap, zoom) is tested and its alignment was checked against an independent perspective calculation, but it has not been seen on the real renderer. Please look at it once in a browser; the thresholds (`EL_ON_PX`, `EL_OFF_PX`, `EL_SHOW`, `EL_HIDE`, `EL_CAP`, `EL_MAX_ATOMS` near `elementLabels` in the viewer) are one-line changes. The flicker fix was measured, not seen: I could not reproduce your exact glitch on the real renderer, so if labels still misbehave, tell me what you see (flicker, wrong position, overlap, wrong size).
+- Peptide models are larger now (Ala₁₂ has 123 atoms, not 60): with hydrogens hidden you see 61 atoms. The Mirror and Bond-rotation labs limit molecules to 80 atoms and use the whole molecule (hydrogens included), so they decline the longer peptides; the 3D labs do not follow the Hydrogens switch.
+- Hidden hydrogens in 2D are only counted from hydrogen atoms that exist in the data; the app does not invent hydrogens for heavy-atom-only imports.
+- A symbol sits on the sphere centre, so it can be partly covered where another atom's sphere overlaps its edge; that is a normal consequence of overlapping spheres. A label that has just become hidden or overlapped can linger for up to about 0.2 s (it fades), by design.
+- **Browser suite:** 5 cases fail exactly as they did in v1.9 (11, 20: they look for a "Teaching, session" section that v1.9 renamed; 39; 46: expects the white outline v1.9 removed; 47). Because test 11 is stale, the session round trip was checked by hand instead (hydrogens and element-label choices survive save and reload; sessions without the new fields load with hydrogens hidden and labels on). `tests/blender_mock_check.py` hits the same stale section name. None of these relate to this work.

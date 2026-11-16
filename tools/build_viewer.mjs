@@ -8,6 +8,11 @@ for(const n of order){const f=fs.existsSync(path.join(root,'src/core',n+'.mjs'))
  src=src.replace(/^import\s*\{([^}]*)\}\s*from\s*'(?:\.\/|\.\.\/core\/)([^']+)\.mjs';?/gm,(m,l,mod)=>{if(!order.includes(mod))throw Error('unknown dependency '+mod+' in '+f);return `const {${l}}=__M['${mod}'];`});
  src=src.replace(/^export\s+((?:async\s+)?function\*?|const|let|class)\s+([A-Za-z0-9_$]+)/gm,(m,k,nm)=>{names.push(nm);return k+' '+nm});
  if(/^(import|export) /m.test(src))throw Error('unhandled import/export in '+f);out+=`__M['${n}']=(()=>{\n${src}\nreturn {${names.join(',')}};})();\n`}
-let html=rd('laura-viewer.html');const a=html.indexOf('<!--LABS-BEGIN-->'),b=html.indexOf('<!--LABS-END-->');if(a<0||b<a)throw Error('LABS markers missing');
+let html=rd('laura-viewer.html');
+// core modules inlined into the main script between /*TAG-BEGIN*/ and /*TAG-END*/ markers (single source of truth: src/core)
+for(const[tag,cname,file]of[['HYDROGENS','Hydrogens','src/core/hydrogens.mjs'],['LAYOUT2D','Layout2D','src/core/layout2d.mjs']]){const raw=rd(file),src=raw.replace(/^export /gm,''),names=[...raw.matchAll(/^export\s+(?:async\s+)?(?:function\*?|const|let|class)\s+([A-Za-z0-9_$]+)/gm)].map(m=>m[1]);
+ const i=html.indexOf('/*'+tag+'-BEGIN*/'),j=html.indexOf('/*'+tag+'-END*/');if(i<0||j<i)throw Error(tag+' markers missing');
+ html=html.slice(0,i)+'/*'+tag+'-BEGIN*/\nconst '+cname+'=(()=>{\n'+src+'\nreturn{'+names.join(',')+'}})();\n'+html.slice(j)}
+const a=html.indexOf('<!--LABS-BEGIN-->'),b=html.indexOf('<!--LABS-END-->');if(a<0||b<a)throw Error('LABS markers missing');
 html=html.slice(0,a)+'<!--LABS-BEGIN-->\n<script>\n(function(){try{\n'+out+'}catch(err){console.error("LAURA labs failed to load",err)}})();\n</script>\n'+html.slice(b);
 fs.writeFileSync(path.join(root,'laura-viewer.html'),html);console.log('labs inlined,',html.length,'bytes');

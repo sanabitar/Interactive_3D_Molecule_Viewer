@@ -14,7 +14,7 @@ OUT=Path(args[args.index('--out')+1]) if '--out' in args else HERE/'results.json
 JSZIP=next((p for p in ['/home/claude/.npm-global/lib/node_modules/docx/node_modules/jszip/dist/jszip.min.js'] if os.path.exists(p)),None)
 SHIM=(HERE/'three_shim.js').read_text()
 RES=[];ERRORS=[]
-def new_page(pw,w=1280,h=800,storage=None):
+def new_page(pw,w=1280,h=800,storage=None,panel=True):
     b=pw.chromium.launch();ctx=b.new_context(viewport={'width':w,'height':h},accept_downloads=True)
     if not REAL:
         ctx.route(re.compile(r'.*three\.min\.js'),lambda r:r.fulfill(body=SHIM,content_type='application/javascript'))
@@ -26,7 +26,9 @@ def new_page(pw,w=1280,h=800,storage=None):
     pg.on('pageerror',lambda e:errs.append('pageerror: '+str(e)))
     pg.on('requestfailed',lambda r:errs.append('requestfailed: '+r.url[:90]) if 'rcsb' not in r.url else None)
     pg.goto(__import__('os').environ.get('LAURA_URL') or 'file://'+str(PAGE));pg.wait_for_function("document.querySelector('#cmn').textContent.trim().length>1")
-    pg.errs=errs;pg._b=b;return pg
+    pg.errs=errs;pg._b=b
+    if panel:pg.click('#rshow')   # the details panel starts closed; most tests use its controls
+    return pg
 ONLY=[a for a in args[args.index('--only')+1].split(',')] if '--only' in args else None
 def case(name):
     def deco(fn):
@@ -62,14 +64,14 @@ def _(pw):
 @case('02 built-in molecule + every rendering style without errors')
 def _(pw):
     pg=new_page(pw);sel_mol(pg,'benzene','Benzene')
-    for st in['bs','sf','st','wf','bb','tb']:pg.select_option('#sty',st);pg.wait_for_timeout(30)
+    for _i in range(4):pg.click('#stb');pg.wait_for_timeout(30);ok(pg.evaluate("document.querySelector('#sty').value") in('bs','tb'),'view must stay one of the two views')
     ok(not pg.errs,str(pg.errs));pg._b.close()
 @case('03 rotate toggle shows/hides speed slider; reset view works')
 def _(pw):
     pg=new_page(pw);ok(not pg.is_visible('#sp'),'slider visible before rotating');pg.click('#ar');ok(pg.is_visible('#sp'),'slider hidden while rotating');pg.click('#ar');ok(not pg.is_visible('#sp'),'slider still visible');pg.click('#rs');ok(not pg.errs,str(pg.errs));pg._b.close()
 @case('04 selection: select all / invert / select-by-element')
 def _(pw):
-    pg=new_page(pw);sel_mol(pg,'pep_alpha');pg.click('#sall');ok('60 atoms selected' in pg.inner_text('#meas'),pg.inner_text('#meas')[:80]);pg.click('#sinv');ok('selected' not in pg.inner_text('#meas'),'invert should empty selection')
+    pg=new_page(pw);sel_mol(pg,'pep_alpha');pg.click('#sall');ok('61 atoms selected' in pg.inner_text('#meas'),pg.inner_text('#meas')[:80]);pg.click('#sinv');ok('selected' not in pg.inner_text('#meas'),'invert should empty selection')
     pg.select_option('#selby','E:N');ok('12' in pg.inner_text('#meas') or '12 atoms' in pg.inner_text('#meas'),'select N: '+pg.inner_text('#sel')[:60]);pg.click('#clr');pg._b.close()
 @case('05 import valid PDB, mmCIF, XYZ (+ warnings for two models)')
 def _(pw):
@@ -93,7 +95,7 @@ def _(pw):
 def _(pw):
     pg=new_page(pw);pg.focus('#gl');w0=pg.evaluate("parseFloat(document.querySelector('main').style.getPropertyValue('--lw'))||260");pg.keyboard.press('ArrowRight');w1=pg.evaluate("parseFloat(document.querySelector('main').style.getPropertyValue('--lw'))")
     ok(w1==w0+20,f'keyboard resize {w0}->{w1}');b=pg.locator('#gl').bounding_box();pg.mouse.move(b['x']+4,b['y']+300);pg.mouse.down();pg.mouse.move(b['x']+154,b['y']+300);pg.mouse.up();w2=pg.evaluate("parseFloat(document.querySelector('main').style.getPropertyValue('--lw'))");ok(w2>w1+100,f'mouse resize {w1}->{w2}')
-    pg.click('#rx');ok(not pg.is_visible('#info'),'right panel still visible');pg.click('#rshow');ok(pg.is_visible('#info'),'panel did not reopen');pg._b.close()
+    pg.click('#rshow');ok(not pg.is_visible('#info'),'right panel still visible');pg.click('#rshow');ok(pg.is_visible('#info'),'panel did not reopen');pg._b.close()
 @case('09 theme toggle persists across reload')
 def _(pw):
     pg=new_page(pw);ok('Dark Mode' in pg.inner_text('#th'),pg.inner_text('#th'));pg.click('#th');ok(pg.evaluate("document.documentElement.dataset.theme")=='dark','not dark');ok('Light Mode' in pg.inner_text('#th'),'label');
@@ -228,16 +230,16 @@ def _(pw):
 @case('34 right-panel X stays visible while the panel content is scrolled')
 def _(pw):
     pg=new_page(pw,1280,430);sel_mol(pg,'pep_alpha')
-    top0=pg.locator('#rx').bounding_box()['y'];ok(pg.evaluate("(()=>{const a=document.querySelector('aside.r');a.scrollTop=0;const s=[...a.querySelectorAll('*')].filter(e=>e.scrollHeight>e.clientHeight+20&&getComputedStyle(e).overflowY!='visible');return s.length})()")>=1,'right panel has nothing to scroll at this height')
+    top0=pg.locator('#rshow').bounding_box()['y'];ok(pg.evaluate("(()=>{const a=document.querySelector('aside.r');a.scrollTop=0;const s=[...a.querySelectorAll('*')].filter(e=>e.scrollHeight>e.clientHeight+20&&getComputedStyle(e).overflowY!='visible');return s.length})()")>=1,'right panel has nothing to scroll at this height')
     pg.evaluate("[...document.querySelectorAll('aside.r, aside.r *')].forEach(e=>{if(e.scrollHeight>e.clientHeight+20&&getComputedStyle(e).overflowY!=='visible')e.scrollTop=9999})");pg.wait_for_timeout(100)
-    bb=pg.locator('#rx').bounding_box();ab=pg.locator('aside.r').bounding_box();ok(bb['y']>=ab['y']-1 and bb['y']+bb['height']<=ab['y']+80 and pg.locator('#rx').is_visible(),f'X scrolled out of view: top {bb["y"]:.0f} (panel top {ab["y"]:.0f})');pg._b.close()
+    bb=pg.locator('#rshow').bounding_box();ok(abs(bb['y']-top0)<1 and pg.locator('#rshow').is_visible(),f'panel toggle moved or scrolled out of view: top {bb["y"]:.0f} (was {top0:.0f})');pg._b.close()
 @case('35 Labels checkbox lives in the Analysis section (not in Analysis tools)')
 def _(pw):
     pg=new_page(pw);ok(pg.evaluate("document.querySelector('#lb').closest('details').querySelector('summary').textContent.trim()")=='Analysis','Labels not under Analysis');ok(pg.evaluate("!!document.querySelector('#so')"),'Selected only missing');pg._b.close()
 @case('36 labels show atom names, not ids: element symbols for generated molecules, real names + residue for proteins')
 def _(pw):
-    pg=new_page(pw);sel_mol(pg,'water','Water');pg.click('#sall');pg.check('#lb');L=labels(pg,3);ok(sorted(x['t'] for x in L)==['H','H','O'],'water labels '+str([x['t'] for x in L]))
-    sel_mol(pg,'pep_alpha');pg.click('#sall');pg.check('#lb');L=labels(pg,5);ok(all(re.fullmatch(r'(N|CA|C|O|CB) ALA\d+:A',x['t']) for x in L),'protein label format: '+str([x['t'] for x in L][:6]));pg._b.close()
+    pg=new_page(pw);sel_mol(pg,'water','Water');pg.check('#hh');pg.click('#sall');pg.check('#lb');L=labels(pg,3);ok(sorted(x['t'] for x in L)==['H','H','O'],'water labels '+str([x['t'] for x in L]))
+    sel_mol(pg,'pep_alpha');pg.click('#sall');pg.check('#lb');L=labels(pg,5);ok(all(re.fullmatch(r'(N|CA|C|O|CB|OXT|H|HA|HB[123]|H[12]|HXT) ALA\d+:A',x['t']) for x in L),'protein label format: '+str([x['t'] for x in L][:6]));pg._b.close()
 @case('37 many atoms + Labels: labels are decluttered (no overlaps, capped) and stay readable')
 def _(pw):
     pg=new_page(pw);sel_mol(pg,'pep_alpha');pg.click('#sall');pg.check('#lb');L=labels(pg,5);ok(len(L)<=80,'too many labels %d'%len(L));ok(not overlaps(L),'overlapping labels: '+str(overlaps(L)[:3]))
@@ -249,8 +251,8 @@ def _(pw):
     pg.click('#ccl');pg.wait_for_function("[...document.querySelectorAll('#lbl .lab')].every(d=>d.style.display==='none')",timeout=3000);ok(pg.inner_text('#cres').strip()=='','results not cleared');pg.click('#cj');ok('Find contacts' in pg.inner_text('#toast'),'results still held after Clear');pg._b.close()
 @case('39 Selected only draws just the selected atoms; unticking restores all')
 def _(pw):
-    pg=new_page(pw);sel_mol(pg,'pep_alpha');ok(pg.evaluate(ATOMMESH)==[60],str(pg.evaluate(ATOMMESH)));pg.select_option('#selby','E:N');pg.check('#so');ok(pg.evaluate(ATOMMESH)==[12],'selected only: '+str(pg.evaluate(ATOMMESH)))
-    pg.click('#clr');ok(pg.evaluate(ATOMMESH)==[60],'empty selection shows everything: '+str(pg.evaluate(ATOMMESH)));pg.select_option('#selby','E:N');ok(pg.evaluate(ATOMMESH)==[12],'reselect');pg.uncheck('#so');ok(pg.evaluate(ATOMMESH)==[60],'untick: '+str(pg.evaluate(ATOMMESH)));pg._b.close()
+    pg=new_page(pw);sel_mol(pg,'pep_alpha');ok(pg.evaluate(ATOMMESH)==[61],str(pg.evaluate(ATOMMESH)));pg.select_option('#selby','E:N');pg.check('#so');ok(pg.evaluate(ATOMMESH)==[12],'selected only: '+str(pg.evaluate(ATOMMESH)))
+    pg.click('#clr');ok(pg.evaluate(ATOMMESH)==[61],'empty selection shows everything: '+str(pg.evaluate(ATOMMESH)));pg.select_option('#selby','E:N');ok(pg.evaluate(ATOMMESH)==[12],'reselect');pg.uncheck('#so');ok(pg.evaluate(ATOMMESH)==[61],'untick: '+str(pg.evaluate(ATOMMESH)));pg._b.close()
 @case('40 imports: rename, save in this browser (IndexedDB), restore after reload, remove; hostile names stay text')
 def _(pw):
     pg=new_page(pw);imp(pg,'alpha12.pdb');ok(pg.is_visible('#impbar'),'import bar not shown for an import');pg.click('#imRen');pg.fill('#rnin','My helix 1');pg.press('#rnin','Enter');pg.wait_for_function("document.querySelector('#cmn').textContent==='My helix 1'",timeout=3000)
@@ -261,7 +263,7 @@ def _(pw):
 @case('41 See in 2D: draws the molecule, hydrogens toggle changes the picture, click enlarges, honest caption')
 def _(pw):
     pg=new_page(pw);sel_mol(pg,'benzene','Benzene');pg.click('#d2');pg.wait_for_selector('#d2c');ink=lambda:pg.evaluate("(()=>{const c=document.querySelector('#d2c'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,b=[d[0],d[1],d[2]];let n=0;for(let i=0;i<d.length;i+=4)if(Math.abs(d[i]-b[0])+Math.abs(d[i+1]-b[1])+Math.abs(d[i+2]-b[2])>30)n++;return n})()")
-    d=ink();ok(d>1500,'diagram not drawn (%d ink pixels)'%d);ok('structure diagram' in pg.inner_text('#mb') and 'stereochemistry' in pg.inner_text('#mb'),'diagram caption missing');pg.select_option('#d2m','proj');a=ink();ok(a>1500,'nothing drawn (%d ink pixels)'%a);ok('not a chemical structure diagram' in pg.inner_text('#mb'),'caption missing');pg.uncheck('#d2h');b=ink();ok(b<a,'hydrogens toggle did not change the picture (%d vs %d)'%(a,b))
+    d=ink();ok(d>1500,'diagram not drawn (%d ink pixels)'%d);ok('structure diagram' in pg.inner_text('#mb') and 'stereochemistry' in pg.inner_text('#mb'),'diagram caption missing');pg.select_option('#d2m','proj');pg.check('#d2h');a=ink();ok(a>1500,'nothing drawn (%d ink pixels)'%a);ok('not a chemical structure diagram' in pg.inner_text('#mb'),'caption missing');pg.uncheck('#d2h');b=ink();ok(b<a,'hydrogens toggle did not change the picture (%d vs %d)'%(a,b))
     pg.click('#d2c');ok(pg.is_visible('#lightbox img') and pg.evaluate("document.querySelector('#lbimg').src").startswith('data:image/png'),'lightbox');pg.keyboard.press('Escape');ok(not pg.is_visible('#lightbox'),'Esc did not close the lightbox');ok(pg.is_visible('#d2c'),'dialog closed with the lightbox');pg.keyboard.press('d');pg._b.close()
 @case('42 compare in 3D: B is drawn as ball-and-stick beside A (no overlap), tagged A/B, and the Compare dialog closes')
 def _(pw):
@@ -271,10 +273,15 @@ def _(pw):
     L=labels(pg,2);tags=[x['t'] for x in L if 'tag' in x['c']];ok(any(t.startswith('A · Water') for t in tags) and any(t.startswith('B · Methane') for t in tags),str(tags));pg._b.close()
 @case('43 tube view names every chain (A, B) with non-overlapping labels')
 def _(pw):
-    pg=new_page(pw);sel_mol(pg,'pep_pair');pg.select_option('#sty','tb');L=labels(pg,2);ch=sorted(x['t'] for x in L if 'chain' in x['c']);ok(ch==['Chain A','Chain B'],str(ch));ok(not overlaps(L),'chain labels overlap');pg.select_option('#sty','bs');pg.wait_for_timeout(200);ok(not any('chain' in x['c'] for x in pg.evaluate(LABJS)),'chain labels remain outside tube view');pg._b.close()
-@case('44 style dropdown: six working styles, no disabled/unimplemented cartoon-surface entry')
+    pg=new_page(pw);sel_mol(pg,'pep_pair');pg.click('#stb');L=labels(pg,2);ch=sorted(x['t'] for x in L if 'chain' in x['c']);ok(ch==['Chain A','Chain B'],str(ch));ok(not overlaps(L),'chain labels overlap');pg.click('#stb');pg.wait_for_timeout(200);ok(not any('chain' in x['c'] for x in pg.evaluate(LABJS)),'chain labels remain outside Chains view');pg._b.close()
+@case('44 view control: one small icon toggle between Ball and stick and Chains; no dropdown, no other styles; Chains falls back when there is no chain')
 def _(pw):
-    pg=new_page(pw);o=pg.eval_on_selector_all('#sty option','o=>o.map(x=>[x.value,x.disabled,x.textContent])');ok(len(o)==6 and not any(x[1] for x in o) and not any('artoon' in x[2] or 'urface' in x[2] for x in o),str(o));pg._b.close()
+    pg=new_page(pw);ok(pg.locator('select#sty').count()==0,'the style dropdown should be gone');b=pg.locator('#stb');bb=b.bounding_box();val=lambda:pg.evaluate("document.querySelector('#sty').value")
+    ok(bb['width']<=40 and bb['height']<=40,'toggle should be a small icon button, got %sx%s'%(bb['width'],bb['height']))
+    ok(b.get_attribute('aria-pressed')=='false' and 'Ball and stick' in b.get_attribute('title'),'starts in Ball and stick: '+b.get_attribute('title'));ok(pg.locator('#stb svg').count()==1 and pg.inner_text('#stb').strip()=='','icon only')
+    sel_mol(pg,'pep_pair');pg.click('#stb');ok(b.get_attribute('aria-pressed')=='true' and 'Chains' in b.get_attribute('title') and val()=='tb' and pg.evaluate("ro.st")=='tb','Chains active: '+b.get_attribute('title'))
+    pg.click('#stb');ok(b.get_attribute('aria-pressed')=='false' and val()=='bs' and pg.evaluate("ro.st")=='bs','back to Ball and stick')
+    sel_mol(pg,'benzene');pg.click('#stb');pg.wait_for_timeout(100);ok(val()=='bs' and b.get_attribute('aria-pressed')=='false','benzene has no chain: Chains must fall back to Ball and stick, got '+val());ok('Chains view needs' in pg.inner_text('#toast'),'the fallback should explain itself');pg._b.close()
 @case('45 analysis dialogs fit the window, wrap text instead of overflowing, and diagrams enlarge on click')
 def _(pw):
     pg=new_page(pw,1280,720);imp(pg,'alpha12.pdb');pg.click('#ra');pg.wait_for_selector('#rcv');b=pg.locator('#mb').bounding_box();ok(b['y']>=0 and b['y']+b['height']<=721 and b['width']<=1280,'dialog box '+str(b))
@@ -303,6 +310,105 @@ def _(pw):
 def _(pw):
     pg=new_page(pw);pg.evaluate("(()=>{Element.prototype.requestFullscreen=()=>Promise.reject(new Error('blocked'))})()");pg.keyboard.press('p');pg.wait_for_function("document.querySelector('#toast').textContent.includes('blocked full screen')",timeout=3000)
     b=pg.evaluate("(()=>{const r=document.querySelector('#vp').getBoundingClientRect();return[r.width,r.height,innerWidth,innerHeight]})()");ok(abs(b[0]-b[2])<=1 and abs(b[1]-b[3])<=1,str(b));pg.keyboard.press('p');pg._b.close()
+@case('50 hydrogens: hidden by default; Display Options checkbox, toolbar button and H key are one switch; hiding never removes atoms from the structure')
+def _(pw):
+    pg=new_page(pw);sel_mol(pg,'ethanol','Ethanol');n=lambda:pg.evaluate(ATOMMESH)[0];total=lambda:pg.evaluate("lauraMirrorSource().atoms.length")
+    ok(not pg.is_checked('#hh') and pg.get_attribute('#hb','aria-pressed')=='false' and n()==3,'hydrogens should start hidden: %s atoms'%n())
+    ok(pg.evaluate("document.querySelector('#hh').closest('details').querySelector('summary').textContent.trim()")=='Display Options','the Show hydrogens checkbox must live in Display Options')
+    ok('Show hydrogens' in pg.inner_text('details.sec:has(#hh)'),'checkbox label')
+    ok(total()==9,'all 9 atoms stay in the structure while hydrogens are hidden (got %s)'%total())
+    pg.check('#hh');pg.wait_for_timeout(100);ok(n()==9 and pg.get_attribute('#hb','aria-pressed')=='true','one click shows all 6 hydrogens (got %s atoms)'%n())
+    pg.click('#hb');pg.wait_for_timeout(100);ok(n()==3 and not pg.is_checked('#hh') and total()==9,'button hides them again; structure still has 9 atoms (%s)'%total())
+    pg.keyboard.press('h');pg.wait_for_timeout(100);ok(n()==9 and pg.is_checked('#hh'),'H key shows');pg.click('#hb');pg.wait_for_timeout(100)
+    ti=pg.evaluate("document.querySelector('#info').textContent").lower();ok('hydrogens: 6' in ti,'details panel still reports the 6 hydrogens while hidden: '+ti[:300])
+    pg.select_option('#mol','phenol');pg.wait_for_function("document.querySelector('#cmn').textContent==='Phenol'",timeout=3000);ok(n()==7 and total()==13,'phenol: 7 heavy atoms shown, 13 in the structure; got %s / %s'%(n(),total()))
+    pg.click('#hb');pg.wait_for_timeout(100);ok(n()==13,'phenol has 13 atoms with hydrogens, got %s'%n());pg._b.close()
+@case('51 hydrogens: typing in an input does not trigger the H shortcut; peptide models have real hydrogens; B-DNA (pseudo-atoms) explains itself')
+def _(pw):
+    pg=new_page(pw);pg.fill('#q','hh');ok(not pg.is_checked('#hh'),'H typed in the search box toggled hydrogens')
+    sel_mol(pg,'pep_alpha');ok(pg.evaluate(ATOMMESH)[0]==61,'Ala12 heavy atoms: %s'%pg.evaluate(ATOMMESH)[0]);pg.click('#hb');pg.wait_for_timeout(100);ok(pg.evaluate(ATOMMESH)[0]==123,'Ala12 with hydrogens should show 123 atoms, got %s'%pg.evaluate(ATOMMESH)[0])
+    sel_mol(pg,'bdna');pg.click('#hb');pg.click('#hb');pg.wait_for_function("document.querySelector('#toast').textContent.includes('pseudo-atoms')",timeout=3000);pg._b.close()
+@case('52 2D view: hydrogens on = H drawn as bonded atoms; off = written on the atom (OH, NH2); the dialog checkbox drives the global switch')
+def _(pw):
+    pg=new_page(pw);sel_mol(pg,'glycine','Glycine (neutral form)');pg.click('#d2');pg.wait_for_selector('#d2c')
+    ink=lambda:pg.evaluate("(()=>{const c=document.querySelector('#d2c'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,b=[d[0],d[1],d[2]];let n=0;for(let i=0;i<d.length;i+=4)if(Math.abs(d[i]-b[0])+Math.abs(d[i+1]-b[1])+Math.abs(d[i+2]-b[2])>30)n++;return n})()")
+    ok(not pg.is_checked('#d2h'),'2D hydrogens checkbox should mirror the global switch (off)');b=ink()
+    pg.check('#d2h');pg.wait_for_timeout(100);ok(pg.is_checked('#hh') and pg.get_attribute('#hb','aria-pressed')=='true','2D checkbox did not switch hydrogens globally');a=ink();ok(a>1500 and b>1500 and a!=b,'picture did not change (%d vs %d)'%(a,b))
+    pg.uncheck('#d2h');pg.wait_for_timeout(100);ok(not pg.is_checked('#hh') and ink()==b,'turning H off should redraw the same picture');pg._b.close()
+@case('53 2D view: every hydrogen-containing built-in molecule draws with hydrogens on and off, without errors')
+def _(pw):
+    pg=new_page(pw)
+    for mid in['water','methane','ammonia','ethanol','acetic','phenol','toluene','aniline','urea','acetone','pyridine','imidazole','serine','cysteine','valine','alanine_h','cyclohexane','hcn','formaldehyde','benzene']:
+        sel_mol(pg,mid);pg.click('#d2');pg.wait_for_selector('#d2c');pg.wait_for_timeout(60)
+        for st in(True,False):
+            pg.set_checked('#d2h',st);pg.wait_for_timeout(40);cap=pg.inner_text('#mb');ok('structure diagram' in cap.lower() or 'diagram' in cap.lower(),mid+': diagram missing')
+            if st:ok(not ('this structure has no hydrogen' in pg.evaluate("document.querySelector('#mb').textContent")),mid)
+        pg.keyboard.press('Escape');pg.wait_for_function("document.querySelector('#modal').style.display!=='flex'",timeout=2000)
+    pg._b.close()
+ELS='Array.from(document.querySelectorAll("#elb .el")).filter(d=>d.style.opacity!=="0").map(d=>({t:d.textContent,x:+d.dataset.x,y:+d.dataset.y,f:+d.dataset.f}))'
+@case('54 element labels: on by default, one symbol per atom sphere, matching the atoms; toggle in Display Options; atoms still clickable underneath')
+def _(pw):
+    pg=new_page(pw);sel_mol(pg,'benzene','Benzene');pg.wait_for_timeout(200)
+    ok(pg.is_checked('#el') and pg.evaluate("document.querySelector('#el').closest('details').querySelector('summary').textContent.trim()")=='Display Options','Element labels should be ticked by default, in Display Options')
+    L=pg.evaluate(ELS);ok(sorted(x['t'] for x in L)==['C']*6,'benzene (hydrogens hidden) should be labelled with its 6 C, got '+str([x['t'] for x in L]))
+    pg.check('#hh');pg.wait_for_timeout(600);L=pg.evaluate(ELS);ok(sorted(x['t'] for x in L)==['C']*6+['H']*6,'with hydrogens: 6 C + 6 H, got '+str(sorted(x['t'] for x in L)))
+    ok(pg.evaluate("getComputedStyle(document.querySelector('#elb')).pointerEvents")=='none','the label layer must not intercept clicks')
+    pg.uncheck('#el');pg.wait_for_timeout(200);ok(len(pg.evaluate(ELS))==0,'unticking removes all element labels');pg.check('#el');pg.wait_for_timeout(600);ok(len(pg.evaluate(ELS))==12,'ticking restores them');pg._b.close()
+@case('55 element labels stay readable and uncluttered: size follows the sphere, zoom reveals more, no two overlap, none for backbone/tube styles or tiny atoms')
+def _(pw):
+    pg=new_page(pw);sel_mol(pg,'pep_alpha');pg.check('#hh');pg.wait_for_timeout(300)
+    boxes=lambda L:[(x['x']-len(x['t'])*x['f']*.33,x['y']-x['f']*.55,x['x']+len(x['t'])*x['f']*.33,x['y']+x['f']*.55) for x in L]
+    def clean(L):
+        b=boxes(L)
+        for i in range(len(b)):
+            for j in range(i+1,len(b)):
+                p,q=b[i],b[j]
+                if not(p[2]<=q[0] or p[0]>=q[2] or p[3]<=q[1] or p[1]>=q[3]):return False
+        return True
+    L=pg.evaluate(ELS);ok(len(L)<=250,'label cap exceeded: %d'%len(L));ok(clean(L),'two element labels overlap (%d labels)'%len(L));ok(all(9<=x['f']<=26 for x in L),'font sizes out of the readable range')
+    n0=len(L);pg.evaluate("(()=>{cam.position.multiplyScalar(.45);lbDirty=true})()");pg.wait_for_timeout(700);L2=pg.evaluate(ELS);ok(clean(L2),'overlap after zoom');ok(max([x['f'] for x in L2]+[0])>=max([x['f'] for x in L]+[0]),'labels should not shrink when zooming in')
+    pg.evaluate("(()=>{cam.position.multiplyScalar(40);lbDirty=true})()");pg.wait_for_timeout(700);ok(len(pg.evaluate(ELS))==0,'zoomed far out the spheres are too small for symbols, so none are drawn (got %d)'%len(pg.evaluate(ELS)))
+    pg.evaluate("(()=>{cam.position.multiplyScalar(1/40);lbDirty=true})()");pg.click('#stb');pg.wait_for_timeout(700);ok(len(pg.evaluate(ELS))==0,'Chains view has no atom spheres, so no element labels')
+    pg.click('#stb');pg.wait_for_timeout(700);ok(len(pg.evaluate(ELS))>0,'ball-and-stick shows them again');pg._b.close()
+@case('56 element labels follow the structure: session round-trip keeps hydrogens/element-label choices; Selected only limits labels to the selection')
+def _(pw):
+    pg=new_page(pw);sel_mol(pg,'glycine','Glycine (neutral form)');pg.check('#hh');pg.uncheck('#el');pg.wait_for_timeout(100)
+    sess=pg.evaluate("(()=>{const e=mol.entry;return JSON.stringify({hydrogens:document.querySelector('#hh').checked,elements:document.querySelector('#el').checked})})()");ok('"hydrogens":true' in sess and '"elements":false' in sess,sess)
+    pg.check('#el');pg.wait_for_timeout(100);pg.select_option('#selby','E:N');pg.wait_for_timeout(100);pg.check('#so');pg.wait_for_timeout(700);L=pg.evaluate(ELS);ok([x['t'] for x in L]==['N'],'selected only + element labels: only the N, got '+str([x['t'] for x in L]));pg._b.close()
+PROJ="""(()=>{THREE.Vector3.prototype.project=function(c){const w=vp.clientWidth,h=vp.clientHeight,t=Math.tan(c.fov*Math.PI/360),p=c.position;
+ let f=[-p.x,-p.y,-p.z];const fl=Math.hypot(...f);f=f.map(v=>v/fl);let r=[f[1]*0-f[2]*1,f[2]*0-f[0]*0,f[0]*1-f[1]*0];const rl=Math.hypot(...r);r=r.map(v=>v/rl);
+ const u=[r[1]*f[2]-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]-r[1]*f[0]];const d=[this.x-p.x,this.y-p.y,this.z-p.z],xc=d[0]*r[0]+d[1]*r[1]+d[2]*r[2],yc=d[0]*u[0]+d[1]*u[1]+d[2]*u[2],zc=d[0]*f[0]+d[1]*f[1]+d[2]*f[2];
+ this.x=xc/(zc*t*(w/h));this.y=yc/(zc*t);this.z=.5;return this}})()"""   # real look-at perspective (the shim's project() ignores depth)
+@case('57 details panel: closed by default (even if an old layout said open); one small icon toggle, always visible, at the side; opens and closes it')
+def _(pw):
+    pg=new_page(pw,panel=False);b=pg.locator('#rshow');vpb=lambda:pg.locator('#vp').bounding_box()
+    ok(pg.evaluate("document.querySelector('main').classList.contains('nor')") and not pg.is_visible('#info'),'details panel should start closed')
+    ok(b.is_visible() and b.get_attribute('aria-expanded')=='false' and 'Open' in b.get_attribute('title'),'icon visible and says Open: '+b.get_attribute('title'))
+    bb=b.bounding_box();ok(bb['width']<=40 and bb['height']<=40 and abs((vpb()['x']+vpb()['width'])-(bb['x']+bb['width']))<=24 and bb['y']-vpb()['y']<=24,'small icon at the top right of the viewer: %s vs %s'%(bb,vpb()))
+    ok(pg.locator('#rx').count()==0,'the old x button inside the panel should be gone')
+    b.click();ok(pg.is_visible('#info') and b.is_visible() and b.get_attribute('aria-expanded')=='true' and 'Close' in b.get_attribute('title'),'open: the icon must stay visible and offer Close');ab=pg.locator('aside.r').bounding_box();bb=b.bounding_box();ok(bb['x']+bb['width']<=ab['x']+1,'icon sits beside the panel, not on it')
+    b.click();ok(not pg.is_visible('#info') and b.is_visible(),'close with the same icon')
+    pg.evaluate("localStorage.setItem('laura-layout',JSON.stringify({lw:'260px',rw:'300px',nor:false}))");pg.reload();pg.wait_for_function("document.querySelector('#cmn').textContent.trim().length>1");ok(not pg.is_visible('#info'),'an old saved layout must not reopen the panel');pg._b.close()
+@case('58 sessions saved with the removed styles still load: stick/wireframe/space-filling become Ball and stick, backbone/tube become Chains')
+def _(pw):
+    import json,tempfile
+    pg=new_page(pw)
+    for old,want in[('sf','bs'),('st','bs'),('wf','bs'),('bb','tb'),('tb','tb'),('bs','bs')]:
+        f=tempfile.NamedTemporaryFile('w',suffix='.json',delete=False);json.dump({'laura':'0.3','structure':{'id':'pep_pair','name':'x','builtin':True},'settings':{'style':old}},f);f.close()
+        pg.set_input_files('#sl',f.name);pg.wait_for_timeout(500);got=pg.evaluate("document.querySelector('#sty').value");ok(got==want,'session style %s -> %s, got %s'%(old,want,got))
+    pg._b.close()
+@case('59 element labels do not flicker while rotating: keyed per atom, moved with transform only, debounced (churn per frame at 1 degree/frame well below the old 6-10%), sizes change smoothly')
+def _(pw):
+    pg=new_page(pw);pg.evaluate(PROJ)
+    for mid,limit in[('pep_alpha',3.2),('pep_hlh',3.2)]:
+        sel_mol(pg,mid);pg.check('#hh');pg.wait_for_timeout(300)
+        r=pg.evaluate("""(()=>{const r0=Math.hypot(cam.position.x,cam.position.y,cam.position.z)*.6;let prev=null,tot=0,chg=0,fs=0,nf=0;
+          for(let k=0;k<180;k++){const a=k*Math.PI/180;cam.position.set(r0*Math.sin(a),r0*.25,r0*Math.cos(a));lbDirty=true;updateLabels();const cur=new Map([...elShown].map(i=>[i,+elNodes.get(i).dataset.f]));
+           if(prev){for(const i of prev.keys())if(!cur.has(i))chg++;for(const i of cur.keys())if(!prev.has(i))chg++;tot+=new Set([...prev.keys(),...cur.keys()]).size;for(const[i,f]of cur)if(prev.has(i)){fs+=Math.abs(f-prev.get(i));nf++}}prev=cur}
+          return{churn:100*chg/tot,fs:fs/nf,n:prev.size}})()""")
+        ok(r['churn']<limit,'%s: %.1f%% of labels appear/vanish per frame at 1 degree/frame (limit %.1f; the old algorithm gave 6-10%%)'%(mid,r['churn'],limit));ok(r['fs']<.25,'%s: label sizes jump (mean change %.2f px/frame)'%(mid,r['fs']));ok(r['n']>20,'%s: too few labels (%d)'%(mid,r['n']))
+    ok(pg.evaluate("[...document.querySelectorAll('#elb .el')].every(n=>n.style.left===''&&n.style.top===''&&n.style.transform.startsWith('translate('))"),'labels must be positioned with transform only, not left/top (no layout work per frame)')
+    pg.uncheck('#el');pg.wait_for_timeout(150);ok(pg.evaluate("[...document.querySelectorAll('#elb .el')].every(n=>n.style.opacity==='0')"),'unticking fades every label out');pg.wait_for_timeout(700);ok(pg.evaluate("document.querySelectorAll('#elb .el').length")==0,'faded labels are removed from the page');pg._b.close()
 @case('23 no console errors or failed requests across the whole run')
 def _(pw):ok(not ERRORS,str(ERRORS)[:200])
 
