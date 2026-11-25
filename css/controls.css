@@ -1,0 +1,12 @@
+/* css/controls.css: Icon buttons, text-style buttons, Dark/Light Mode buttons and range sliders.
+   Rule ORDER matters across the css/ files (later rules override earlier ones); index.html loads them in this order. */
+.ib{width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center}#tb .ib{width:32px}
+.ib svg,.ghost svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ib.on{border-color:var(--ac);color:var(--ac);background:color-mix(in srgb,var(--ac) 12%,var(--sf))}
+.ghost{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;font-weight:700;letter-spacing:.07em;font-size:11px}.ghost svg{width:16px;height:16px}.ghost:hover:not(:disabled){background:var(--bg)}header .ib{border-color:transparent;background:transparent}header .ib:hover:not(:disabled){background:var(--bg)}
+.th{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:600;border-radius:8px;padding:0;width:130px;height:34px;box-sizing:border-box;white-space:nowrap}.th svg{width:18px;height:18px}
+.th-dark{background:#1b5e20;color:#fff;border:0}.th-dark:hover:not(:disabled){filter:brightness(1.12)}
+.th-light{background:#86efac;color:#0b2a14;border:0}.th-light:hover:not(:disabled){filter:brightness(1.05)}
+input[type=range]{-webkit-appearance:none;appearance:none;height:4px;padding:0;border:0;border-radius:2px;background:var(--bd);accent-color:var(--ac)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--ac);border:0;cursor:pointer}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--ac);border:0;cursor:pointer}

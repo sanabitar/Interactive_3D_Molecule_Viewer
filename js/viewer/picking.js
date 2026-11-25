@@ -1,0 +1,9 @@
+// js/viewer/picking.js: Mouse picking and the hover tooltip, and the render loop. renderLoop() is only defined here; main.js starts it.
+// ---------- picking ----------
+const rc=new THREE.Raycaster(),mp=new THREE.Vector2();let down=null;
+function pick(e){if(!aMesh)return-1;const r=ren.domElement.getBoundingClientRect();mp.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);rc.setFromCamera(mp,cam);const h=rc.intersectObject(aMesh)[0];return h?aMesh.userData.map[h.instanceId]:-1}
+if(ren){const cv=ren.domElement;cv.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
+cv.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>4)return;const i=pick(e);if(i<0)return;if(ro.st==='tb'){const c=mol.atoms[i].chain,ids=vis.filter(j=>mol.atoms[j].chain===c),all=ids.every(j=>sel.includes(j));sel=all?sel.filter(j=>!ids.includes(j)):[...new Set([...sel,...ids])]}else{const k=sel.indexOf(i);if(k>=0)sel.splice(k,1);else{sel.push(i)}}refreshSel()});
+let busy=0;cv.addEventListener('pointermove',e=>{if(busy)return;busy=1;requestAnimationFrame(()=>{busy=0;const i=pick(e),t=$('#tip');if(i<0){t.style.display='none';return}const a=mol.atoms[i],r=vp.getBoundingClientRect();t.textContent=ro.st==='tb'?`Chain ${a.chain||'—'}${a.res?' · '+a.res+a.resi:''}`:`${a.el} ${a.name}${a.res?' · '+a.res+a.resi:''}${mol.hyb[i]?' · '+mol.hyb[i]:''}`;t.style.display='block';t.style.left=e.clientX-r.left+12+'px';t.style.top=e.clientY-r.top+12+'px'})});cv.addEventListener('pointerleave',()=>$('#tip').style.display='none')}
+// The render loop is only DEFINED here; main.js starts it (start-up side effects live in main.js, so no file can run before something it needs exists).
+function renderLoop(){requestAnimationFrame(renderLoop);if(ren){ctl.update();ren.render(scene,cam);updateLabels()}}

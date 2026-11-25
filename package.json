@@ -1,1 +1,1 @@
-{"name": "laura-core", "private": true, "type": "module", "scripts": {"test": "node --test"}}
+{"name": "laura-core", "private": true, "type": "module", "scripts": {"test": "node --test", "build": "node tools/build_viewer.mjs", "check:generated": "node tools/build_viewer.mjs --check"}}

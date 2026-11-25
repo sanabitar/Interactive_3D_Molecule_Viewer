@@ -1,0 +1,30 @@
+/* css/dialogs.css: The INFO card and the Help dialog.
+   Rule ORDER matters across the css/ files (later rules override earlier ones); index.html loads them in this order. */
+#infomodal{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);padding:16px}#infomodal.open{display:flex}
+#infomodal .ic{position:relative;background:#16221b;color:#e8ede9;border:1px solid #2c4a38;border-radius:18px;max-width:800px;width:100%;max-height:92vh;overflow:auto;padding:0;text-align:center;font-size:13.5px;line-height:1.5;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+#infomodal .hero{position:relative;padding:44px 40px 34px;background:linear-gradient(160deg,#0f5a37 0%,#093a24 55%,#031a0f 100%);border-bottom:1px solid rgba(255,255,255,.14)}
+#infomodal .logo{position:absolute;left:44px;top:34px;width:96px;height:auto}
+#infomodal .eyebrow{margin:34px 0 0;font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#7fe0a6}
+#infomodal h2{margin:14px 0 8px;font-size:42px;line-height:1.1;font-weight:800;letter-spacing:-.02em;color:#fff}#infomodal h2 span{font-weight:300;color:#3fbf7a}
+#infomodal .tag{margin:0;font-size:13.5px;color:#d4e2d9}
+#infomodal .body{padding:0 36px}
+#infomodal .s{padding:22px 0;border-bottom:1px solid rgba(255,255,255,.12)}
+#infomodal .s .l{display:block;margin-bottom:10px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#7fe0a6}
+#infomodal .s .n{font-size:16px;font-weight:600;color:#fff;margin-bottom:8px}
+#infomodal .s .d{font-size:12.5px;color:#cfdad2;line-height:1.7}
+#infomodal .foot{padding:26px 36px 28px}#infomodal .foot b{display:block;font-size:14px;color:#fff;margin-bottom:10px}#infomodal .foot .u{font-size:14px;color:#d4e2d9;margin-bottom:12px}#infomodal .foot small{font-size:11px;color:#9fb3a6}
+#imx{position:absolute;top:22px;right:22px;width:30px;height:30px;padding:0;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.28);display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;z-index:1}#imx:hover{background:rgba(255,255,255,.2)}
+@media(max-width:560px){#infomodal .hero{padding:24px 20px 26px}#infomodal .logo{position:static;display:block;margin:0 auto 14px}#infomodal .eyebrow{margin-top:8px}#infomodal h2{font-size:32px}#infomodal .body{padding:0 20px}}
+
+input[type=checkbox],input[type=radio]{accent-color:var(--ac)}
+/* Help dialog: match the INFO card's typography and green-accent hierarchy without changing other dialogs. */
+#mb:has(.help-content){background:var(--sf);color:var(--tx);border:1px solid var(--bd);border-radius:18px;padding:30px 36px;max-width:min(790px,96vw);line-height:1.6;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.help-content{font-size:13.5px;color:var(--tx)}
+.help-content .help-main-title,.help-content .help-guide-title{display:block;font-size:22px;line-height:1.25;font-weight:750;color:var(--tx);margin:0 0 18px;padding:0 0 12px;border-bottom:1px solid var(--bd)}
+.help-content ul{padding-left:22px!important;line-height:1.6!important;margin:0 0 20px}
+.help-content li{padding-left:2px;margin:0 0 12px}
+.help-content li>b:first-child,.help-content li .help-subtitle{display:block;font-size:14px;font-weight:750;color:var(--ac);margin:0 0 2px}
+.help-content p{margin:0 0 16px}
+.help-content p>b:first-child{font-size:14px;font-weight:750;color:var(--ac)}
+.help-content hr{border:0;border-top:1px solid var(--bd);margin:22px 0 16px}
+

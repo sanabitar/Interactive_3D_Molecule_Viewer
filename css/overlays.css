@@ -1,0 +1,16 @@
+/* css/overlays.css: Presentation mode, the scrolling details panel, atom labels (element symbols and name labels) and the enlarged-diagram lightbox.
+   Rule ORDER matters across the css/ files (later rules override earlier ones); index.html loads them in this order. */
+
+/* presentation mode: the viewer is pinned to the whole window */
+body.pm #app{grid-template-rows:1fr}body.pm #vp{position:fixed;inset:0;z-index:6;min-height:0}body.pm #lbl{z-index:7}body.pm #elb{z-index:7}
+/* right panel: X stays put, content scrolls underneath */
+aside.r{padding:0;overflow:hidden;position:relative}.rscroll{height:100%;overflow:auto;padding:8px 10px}
+/* element symbols on the atom spheres */
+#elb{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}.el{position:absolute;left:0;top:0;transform-origin:50% 50%;will-change:transform,opacity;font:700 14px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none;user-select:none;transition:opacity .18s;animation:elin .15s ease-out}@keyframes elin{from{opacity:0}}
+/* decluttered labels */
+#lbl{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}.lab{position:absolute;display:none;transform:translate(-50%,-135%);font:600 11px/1.25 system-ui,sans-serif;color:#fff;background:rgba(15,23,18,.78);padding:1px 6px;border-radius:4px;white-space:nowrap;box-shadow:0 0 0 1px rgba(255,255,255,.18)}
+.lab.contact{background:#b45309}.lab.chain{background:var(--ac);color:#fff}.lab.tag{background:#1d4ed8;font-size:12px}
+/* enlarge diagrams */
+#mb canvas{width:auto;height:auto;max-width:100%;max-height:min(52vh,560px);margin:0 auto;cursor:zoom-in}#mb pre{white-space:pre-wrap}#mb select,#mb input[type=text],#mb textarea{max-width:100%}#mb p,#mb label{overflow-wrap:anywhere}#mb table{display:block;overflow-x:auto}
+#lightbox{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(0,0,0,.82)}#lightbox.open{display:flex}#lbview{width:min(96vw,1200px);height:min(78vh,820px);overflow:hidden;border-radius:8px;background:var(--sf);touch-action:none;cursor:zoom-in}#lbview.zm{cursor:grab}#lbview.pan{cursor:grabbing}#lbimg{width:100%;height:100%;object-fit:contain;transform-origin:center;user-select:none;-webkit-user-drag:none;display:block}.lbbar{display:flex;gap:6px}.lbbar button{min-width:36px}#lightbox .kv{color:#cfd8d2}
+@media(max-height:760px){#mb{font-size:12.5px}#mb canvas{max-height:46vh}}

@@ -1,0 +1,11 @@
+// js/ui/header.js: Header controls: the INFO card, fullscreen, and the Dark/Light Mode button.
+// ---------- header: info, fullscreen, theme button ----------
+const IM=$('#infomodal'),imOpen=o=>{IM.classList.toggle('open',o);if(o)$('#imx').focus();else $('#inf').focus()};
+$('#inf').onclick=()=>imOpen(true);$('#imx').onclick=()=>imOpen(false);IM.onclick=e=>{if(e.target===IM)imOpen(false)};
+const FS_IN='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>',FS_OUT='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M20 15h-5v5M4 15h5v5"/></svg>';
+const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
+async function toggleFS(){try{const d=document.documentElement;if(fsEl()){await(document.exitFullscreen||document.webkitExitFullscreen).call(document)}else{const rq=d.requestFullscreen||d.webkitRequestFullscreen;if(!rq)throw Error('unsupported');await rq.call(d)}}catch(e){toast('Fullscreen is not available in this embedded view. Open the page in its own browser tab to use it.',6000)}}
+function fsUpdate(){const on=!!fsEl(),b=$('#fs');b.innerHTML=on?FS_OUT:FS_IN;b.title=on?'Exit fullscreen (F)':'Fullscreen (F)';b.setAttribute('aria-label',b.title);setTimeout(()=>{size()},60)}
+$('#fs').onclick=toggleFS;document.addEventListener('fullscreenchange',fsUpdate);document.addEventListener('webkitfullscreenchange',fsUpdate);
+const MOON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" fill="#f7c948" stroke="#e0a800" stroke-width="1" style="fill:#f7c948;stroke:#e0a800"/></svg>',SUN='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.6" style="fill:#f5a623;stroke:#e8870e;stroke-width:1.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M5.3 18.7l1.9-1.9M16.8 7.2l1.9-1.9" style="fill:none;stroke:#e8870e;stroke-width:1.9;stroke-linecap:round"/></svg>';
+function thBtn(){const dark=(document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'))==='dark',b=$('#th');b.className=dark?'th th-light':'th th-dark';b.innerHTML=dark?SUN+'<span>Light Mode</span>':MOON+'<span>Dark Mode</span>';b.title=dark?'Switch to light mode (T)':'Switch to dark mode (T)';b.setAttribute('aria-label',b.title)}

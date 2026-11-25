@@ -1,11 +1,9 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
-// Built-in molecule verification. The library lives inside laura-viewer.html, so it is evaluated here (no DOM needed).
+// Built-in molecule verification. The library lives in js/foundation/library.js (plus constants, hydrogens and core), so those files are evaluated here (no DOM needed).
 // The expected chemistry comes from SMILES strings parsed by an independent mini-parser (implicit hydrogens from standard valences),
 // NOT from the code that builds the molecules. Each atom is compared by its local environment: element + sorted neighbour elements.
-const html=fs.readFileSync(new URL('../laura-viewer.html',import.meta.url),'utf8');
-const a=html.indexOf('/*HYDROGENS-BEGIN*/'),b=html.indexOf('let imported=[];'),c=html.indexOf('const Core=(()=>{'),d=html.indexOf('})();',html.indexOf('return{parsePDB,'))+5,
- cb=html.indexOf('function computeBonds(A)'),ce=html.indexOf('// ---------- measurements ----------'),h0=html.indexOf('const CPK={'),h1=html.indexOf('function toast(');
-const {LIB,Core,computeBonds}=new Function(html.slice(h0,h1)+'\n'+html.slice(a,b)+'\n'+html.slice(c,d)+'\n'+html.slice(cb,ce)+'\nreturn {LIB,Core,computeBonds};')();
+import {read} from './helpers/viewer-source.mjs';
+const {LIB,Core,computeBonds}=new Function([read('js/foundation/constants.js'),read('js/generated/hydrogens.js'),read('js/foundation/library.js'),read('js/foundation/core.js')].join('\n')+'\nreturn {LIB,Core,computeBonds};')();
 
 function parseSmiles(s){const atoms=[],bonds=[],stack=[],ring={},VAL={C:4,N:3,O:2,S:2};let prev=null,ord=null;
  for(const t of s.match(/\[[^\]]+\]|Cl|Br|[BCNOPSFI]|[cnos]|\(|\)|=|#|\d/g)){
@@ -45,7 +43,6 @@ test('L-alanine and L-serine keep the L configuration after hydrogens were added
   CA=1,C=2,N=0,R=5,hCA=m.findIndex((x,k)=>x.el==='H'&&Math.hypot(...v(k,CA))<1.15&&k>R),u=v(hCA,CA),co=v(C,CA),r=v(R,CA),n=v(N,CA);
   // looking from H towards CA, CO -> R -> N should run clockwise for L: triple product sign checked against the heavy-atom scaffold used before (>0 L)
   const tp=co[0]*(r[1]*n[2]-r[2]*n[1])-co[1]*(r[0]*n[2]-r[2]*n[0])+co[2]*(r[0]*n[1]-r[1]*n[0]);assert.ok(tp>0,id+' triple product '+tp.toFixed(2));assert.ok(hCA>0&&Math.hypot(...u)>1)}});
-test('the inlined Hydrogens block equals src/core/hydrogens.mjs',()=>{const src=fs.readFileSync(new URL('../src/core/hydrogens.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n').replace(/^export /gm,''),i=html.indexOf('/*HYDROGENS-BEGIN*/'),j=html.indexOf('/*HYDROGENS-END*/');assert.ok(i>0&&j>i&&html.slice(i,j).includes(src))});
 import {layout2D,drawnOrdersAndCharges} from '../src/core/layout2d.mjs';
 test('2D structure diagram of every all-atom built-in molecule: every H drawn as a bonded atom, no overlaps; hidden H still counted for labels',()=>{
  let n=0;for(const e of LIB.filter(e=>!e.noH&&!PEPTIDES.includes(e))){const m=e.get().atoms.map(x=>({...x,element:x.el,resName:x.res,hetero:false})),bonds=computeBonds(m),ord=Core.assignBondOrders(m,bonds),dr=drawnOrdersAndCharges(m,bonds,ord),ids=m.map((_,i)=>i);

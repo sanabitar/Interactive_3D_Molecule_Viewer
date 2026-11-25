@@ -1,0 +1,15 @@
+// js/app/rcsb.js: Fetching from RCSB: metadata, text search and downloading a structure by ID.
+async function rcsbMeta(id){const r=await fetch('https://data.rcsb.org/rest/v1/core/entry/'+id);if(!r.ok)throw Error('metadata '+r.status);const j=await r.json(),i=j.rcsb_entry_info||{},c=j.rcsb_primary_citation||{};
+return{title:j.struct&&j.struct.title,method:j.exptl&&j.exptl[0]&&j.exptl[0].method,res:i.resolution_combined&&i.resolution_combined[0],cite:c.title,doi:c.pdbx_database_id_doi,date:j.rcsb_accession_info&&j.rcsb_accession_info.deposit_date}}
+async function rcsbSearch(q){const r=await fetch('https://search.rcsb.org/rcsbsearch/v2/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:{type:'terminal',service:'full_text',parameters:{value:q}},return_type:'entry',request_options:{paginate:{start:0,rows:10}}})});
+if(r.status===204)return[];if(!r.ok)throw Error('HTTP '+r.status);return(await r.json()).result_set.map(x=>x.identifier)}
+async function fetchId(id){const my=++tok;ov('Fetching '+id+' from RCSB…');let f='mmCIF',text;
+try{let r=await fetch(`https://files.rcsb.org/download/${id}.cif`);if(r.ok)text=await r.text();else{f='PDB';r=await fetch(`https://files.rcsb.org/download/${id}.pdb`);if(!r.ok)throw Error('RCSB returned HTTP '+r.status+' for '+id)}
+if(f==='PDB')text=await r.text();if(my!==tok)return;const p=parseFile(id+(f==='mmCIF'?'.cif':'.pdb'),text);let m={};try{m=await rcsbMeta(id)}catch(e){}
+const e={id,file:id+(f==='mmCIF'?'.cif':'.pdb'),name:id+(m.title?' — '+m.title:''),abbr:id,cat:'Imported and user-added structures',desc:m.title||'Fetched from the RCSB Protein Data Bank.',src:`RCSB PDB ${id}, retrieved ${new Date().toISOString().slice(0,10)} (rcsb.org/structure/${id}); mmCIF/PDB coordinates are experimental unless the entry states otherwise`,fmt:f,
+sci:[m.method&&'Method: '+esc(m.method),m.res!=null&&'Resolution: '+esc(m.res)+' Å',m.date&&'Deposited: '+esc(String(m.date).slice(0,10)),m.cite&&'Primary citation: '+esc(m.cite)+(m.doi?' (doi:'+esc(m.doi)+')':'')].filter(Boolean).join('<br>')||'Entry metadata unavailable (request failed).',get:()=>p};
+if(p.warnings.length)toast(p.warnings.join(' '),9000);imported.push(e);cats();load(e)}
+catch(x){ov(`<div><b>Could not fetch ${esc(id)}</b><p>${esc(x.message)}. Published pages may be blocked from reaching rcsb.org; run LAURA from a local file or import the structure file instead.</p><button onclick="ov()">Dismiss</button></div>`)}}
+$('#rsb').onclick=async()=>{const q=$('#rq').value.trim(),b=$('#rres');if(!q)return;b.textContent='Searching…';try{const ids=await rcsbSearch(q);if(!ids.length){b.textContent='No results.';return}b.innerHTML='';
+ids.forEach(id=>{const d=document.createElement('div');d.className='it';d.tabIndex=0;d.textContent=id;d.onclick=()=>fetchId(id);d.onkeydown=e=>e.key==='Enter'&&fetchId(id);b.appendChild(d);rcsbMeta(id).then(m=>{d.textContent=id+' — '+(m.title||'')}).catch(()=>{})})}
+catch(e){b.textContent='Search failed: '+e.message+'. This page may be blocked from reaching rcsb.org; run it locally or import a file.'}};

@@ -1,0 +1,31 @@
+/* css/panels.css: Section headers, the library panel (current molecule, search, filters, list), file inputs, analysis tool blocks, and the small-screen / dark-mode / reduced-motion overrides.
+   Rule ORDER matters across the css/ files (later rules override earlier ones); index.html loads them in this order. */
+/* subtitles: one format for every section (and Scientific details) */
+details.sec>summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;font-size:12.5px;font-weight:600;color:var(--tx);padding:6px 10px;border:1px solid var(--bd);border-radius:8px;background:color-mix(in srgb,var(--ac) 5%,var(--sf));user-select:none}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary:hover{border-color:var(--ac)}
+details.sec>summary svg{width:15px;height:15px;flex:none;stroke:var(--ac);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+details.sec>summary::after{content:'';margin-left:auto;width:6px;height:6px;border-right:1.6px solid var(--mu);border-bottom:1.6px solid var(--mu);transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s}
+details.sec[open]>summary::after{transform:rotate(-135deg) translate(-2px,-2px);border-color:var(--ac)}
+details.sec[open]>summary{margin-bottom:8px}
+/* library panel */
+.ttl{font-size:14px;font-weight:700;color:var(--tx)}.ttlrow{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+aside.lib{padding:14px 12px}
+aside.lib input[type=text],aside.lib select{font-size:13px;padding:8px 10px;border-radius:8px;margin-bottom:0}
+.curmol{position:relative;margin-bottom:10px;padding:9px 34px 9px 12px;border:1px solid var(--bd);border-left:3px solid var(--ac);border-radius:10px;background:var(--sf);cursor:pointer}
+.curmol:hover{border-color:var(--ac)}.curmol:focus-within{outline:2px solid var(--ac);outline-offset:1px}
+.cm-name{font-weight:700;font-size:14px;line-height:1.3;word-break:break-word}.curmol .kv{margin-top:2px;font-size:12px}
+.cm-chev{position:absolute;right:10px;top:50%;width:16px;height:16px;margin-top:-8px;stroke:var(--mu);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.curmol select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0;padding:0;font-size:16px}
+.search{position:relative;margin-bottom:10px}.search svg{position:absolute;left:10px;top:50%;width:15px;height:15px;margin-top:-7.5px;stroke:var(--mu);fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}.search input{padding-left:32px!important}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}.filters label{display:block;min-width:0}.filters span{display:block;font-size:11px;color:var(--mu);margin-bottom:3px;letter-spacing:.02em}
+.filters select{width:100%;-webkit-appearance:none;appearance:none;padding-right:26px!important;text-overflow:ellipsis;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23809088' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;background-size:14px}
+#list{min-height:260px;max-height:62vh;resize:vertical;overflow:auto;border:1px solid var(--bd);border-radius:10px;padding:4px;margin-bottom:4px}
+.it{padding:7px 10px;border-radius:7px;border:1px solid transparent;border-left:3px solid transparent;font-size:13px}.it small{font-size:11.5px;line-height:1.35}
+.it.on{border-left-color:var(--ac);background:color-mix(in srgb,var(--ac) 9%,var(--sf))}
+input[type=file]{width:100%;font-size:12px;color:var(--mu)}input[type=file]::file-selector-button{font:inherit;font-size:12px;padding:4px 10px;margin-right:8px;border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--tx);cursor:pointer}input[type=file]::file-selector-button:hover{border-color:var(--ac)}
+.tg button:hover:not(:disabled),.row button:hover:not(:disabled){background:color-mix(in srgb,var(--ac) 8%,var(--sf))}
+@media(max-width:700px){header{flex-wrap:wrap;gap:8px;padding:8px 10px}.cur,header .sp{display:none}header .brand{margin-right:auto}.th{width:44px}.th span{display:none}.ghost{padding:4px 6px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) button.p{color:#0d100e}}:root[data-theme=dark] button.p{color:#0d100e}
+.td{margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--bd)}.td>summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;border-radius:8px}.td>summary:hover .tt{color:var(--ac)}.td>summary::after{content:"About ▾";margin-left:auto;font-size:12px;color:var(--mu);white-space:nowrap}.td[open]>summary{margin-bottom:10px}.td[open]>summary::after{content:"Hide ▴"}.td>summary::-webkit-details-marker{display:none}.td>summary svg{width:20px;height:20px;flex:none;stroke:var(--ac);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.td .tt{display:block;font-size:17px;font-weight:600}.td .ts{display:block;color:var(--mu);font-size:12px}.td h4{margin:12px 0 4px;font-size:14px;text-transform:none;letter-spacing:0;color:inherit}.td p{margin:0;font-size:13px}.td ol{margin:0;padding-left:20px;font-size:13px}.td li{margin:2px 0}.td .tn{margin-top:14px;padding-top:8px;border-top:1px solid var(--bd);color:var(--mu);font-size:12px}

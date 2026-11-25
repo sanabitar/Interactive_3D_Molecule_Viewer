@@ -1,0 +1,14 @@
+/* css/import-and-plots.css: The import section and dialog graphics (plots and images keep their aspect ratio).
+   Rule ORDER matters across the css/ files (later rules override earlier ones); index.html loads them in this order. */
+/* import section */
+.filebtn{display:inline-flex;align-items:center;padding:5px 12px;border:1px solid var(--bd);border-radius:6px;cursor:pointer;font-size:12px;background:var(--sf)}.filebtn:hover{border-color:var(--ac)}.impbox{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+details.sub>summary{cursor:pointer;font-size:12px;color:var(--mu);margin-top:8px}details.sub[open]>summary{margin-bottom:2px}
+/* Modal graphics: keep generated plot canvases at their intrinsic aspect ratio instead of stretching to modal width. */
+#mb{min-width:0;max-width:min(920px,96vw);overflow-x:hidden}
+#mb canvas{display:block;width:auto;max-width:100%;height:auto;max-height:min(52vh,560px);object-fit:contain;cursor:zoom-in;margin:8px auto}
+#mb img,#mb svg,#mb video{display:block;width:auto;max-width:100%;height:auto;max-height:60vh;object-fit:contain;margin:8px auto}
+@media(max-height:760px){#mb canvas{max-height:46vh}}
+/* Keep analysis title icons compact; the generic modal SVG rule must not enlarge them. */
+#mb .td>summary svg{display:block;width:20px;height:20px;max-width:20px;max-height:20px;object-fit:contain;margin:0;flex:0 0 20px}
+/* Ramachandran plot: give the square canvas a useful readable size without stretching its axes. */
+#mb #rcv{display:block;width:min(100%,560px);height:auto;max-width:100%;max-height:none;aspect-ratio:1/1;object-fit:contain;margin:12px auto;touch-action:none;cursor:zoom-in}

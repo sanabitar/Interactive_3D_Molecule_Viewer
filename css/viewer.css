@@ -1,0 +1,10 @@
+/* css/viewer.css: The 3D viewport: toolbar, loading/error overlay, atom tooltip, toast message and the presentation card.
+   Rule ORDER matters across the css/ files (later rules override earlier ones); index.html loads them in this order. */
+#tb{position:absolute;top:10px;left:10px;right:52px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#tb>*{width:auto;margin:0}
+#ov,#tip,#pres{position:absolute}
+#ov{inset:0;display:none;align-items:center;justify-content:center;background:color-mix(in srgb,var(--vp) 80%,transparent);text-align:center;padding:20px}
+#tip{pointer-events:none;background:var(--sf);border:1px solid var(--bd);border-radius:6px;padding:2px 8px;font-size:12px;display:none}
+#toast{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:8px 14px;border-radius:8px;display:none;max-width:90%;z-index:9}
+#pres{display:none;left:20px;bottom:20px;max-width:520px}#pres h2{margin:0}
+body.pm header,body.pm footer,body.pm aside{display:none}body.pm main{grid-template-columns:1fr}body.pm #pres{display:block}

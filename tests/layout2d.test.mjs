@@ -16,5 +16,4 @@ test('hydrogens are counted as labels, not drawn; unsupported systems are reject
  const nb=build(Array(7).fill('C'),[[0,1],[1,2],[2,3],[3,4],[4,0],[0,5],[5,6],[6,3]]);const x=lay(nb);assert.equal(x.ok,false);assert.match(x.reason,/bridged|spiro/)});
 test('disconnected molecules are laid out side by side',()=>{const m=build(['O','H','H','C','C'],[[0,1],[0,2],[3,4]]),r=lay(m);assert.equal(r.components,2);assert.equal(r.overlaps,0)});
 import fs from 'node:fs';
-test('viewer inlines exactly the layout2d module',()=>{const html=fs.readFileSync(new URL('../laura-viewer.html',import.meta.url),'utf8'),src=fs.readFileSync(new URL('../src/core/layout2d.mjs',import.meta.url),'utf8').replace(/^export /gm,'');
- const i=html.indexOf('/*LAYOUT2D-BEGIN*/'),j=html.indexOf('/*LAYOUT2D-END*/');assert.ok(i>0&&j>i);assert.ok(html.slice(i,j).includes(src))});
+test('the viewer uses exactly the layout2d module (js/generated/layout2d.js)',()=>{const gen=fs.readFileSync(new URL('../js/generated/layout2d.js',import.meta.url),'utf8'),src=fs.readFileSync(new URL('../src/core/layout2d.mjs',import.meta.url),'utf8').replace(/^export /gm,'');assert.ok(gen.includes(src))});

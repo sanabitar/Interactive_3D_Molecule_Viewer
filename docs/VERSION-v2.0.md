@@ -34,8 +34,15 @@ v2.0 covers two things: hydrogens (a proper Show hydrogens option and complete h
 
 ## Project
 - New `src/core/hydrogens.mjs`; `src/core/layout2d.mjs` gained explicit-H placement, label text and charge helpers; `src/core/session.mjs` has the new `elements` setting and the hydrogens-off default.
-- `node tools/build_viewer.mjs` writes the inlined copies of `hydrogens.mjs` and `layout2d.mjs` into the viewer (between `/*HYDROGENS-BEGIN*/` and `/*LAYOUT2D-BEGIN*/` markers). Run it after editing either file.
+- `node tools/build_viewer.mjs` writes `js/generated/hydrogens.js`, `layout2d.js` and `labs.js` from `src/` (see the next section). Run it after editing `hydrogens.mjs`, `layout2d.mjs` or `src/labs`.
 - **Tests:** 159 Node tests pass (58 new). The browser suite has 54 of 59 passing, with new or rewritten cases 44, 50-59 and updates to 02, 04, 36, 39, 41, 43. The browser tests open the details panel first (it starts closed); test 57 covers the closed default.
+
+## 5. Project structure: the single HTML file is split
+`laura-viewer.html` (300 KB with inline CSS and three inline scripts) is now `index.html` (52 KB, markup only) plus `css/` (9 files) and `js/` (31 files). The layout, load order and rules are in `docs/ARCHITECTURE.md`.
+- **Behaviour is unchanged.** CSS rules keep their exact order, the scripts keep their exact order, and the markup is byte-for-byte the same. Checked by: read-back equality of every piece; computed styles and bounding boxes of all ~470 elements compared with the old page in 9 UI states in light and dark themes (identical); and the browser suite over HTTP and from `file://` (54 of 59, the same 5 known failures as before).
+- **Still opens by double-click.** Classic scripts, not ES modules.
+- **Three deliberate code changes**, all about start-up: the render loop and the "restore saved imports" call now start from `js/main.js` instead of during load (`renderLoop`, `restoreSavedImports`), and `esc()` moved into `constants.js`. This is a precaution (with many script files a frame or callback could in principle fire between two of them); I could not make the old order fail in testing.
+- `tools/build_viewer.mjs` now writes the generated files (it no longer edits the HTML); `--check` verifies they are current. New tests: `tests/structure.test.mjs`, `tests/generated.test.mjs`.
 
 ## Limits
 - **3D rendering could not be exercised here:** the browser suite runs on a Three.js stand-in, so the label *logic* (which symbols, where, how big, overlap, zoom) is tested and its alignment was checked against an independent perspective calculation, but it has not been seen on the real renderer. Please look at it once in a browser; the thresholds (`EL_ON_PX`, `EL_OFF_PX`, `EL_SHOW`, `EL_HIDE`, `EL_CAP`, `EL_MAX_ATOMS` near `elementLabels` in the viewer) are one-line changes. The flicker fix was measured, not seen: I could not reproduce your exact glitch on the real renderer, so if labels still misbehave, tell me what you see (flicker, wrong position, overlap, wrong size).

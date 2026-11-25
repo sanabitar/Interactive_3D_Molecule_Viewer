@@ -1,0 +1,15 @@
+/* css/layout.css: Panel layout: library | viewer | details grid, resize handles, details-panel toggle, collapsible sections, tool button grid, narrow-screen rules.
+   Rule ORDER matters across the css/ files (later rules override earlier ones); index.html loads them in this order. */
+.kv{font-size:13px;color:var(--mu)}.kv b{color:var(--tx);font-weight:600}
+details{margin-top:8px}.row{display:flex;gap:6px;flex-wrap:wrap}.row>*{width:auto;margin:0}
+@media(max-width:900px){.gh{display:none}main,main.nor{grid-template-columns:1fr;grid-auto-rows:minmax(300px,auto);overflow:auto}aside{border:0;border-bottom:1px solid var(--bd)}}
+footer .ft{font-weight:600;color:var(--tx);font-size:12px;margin-bottom:6px}.cr{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 22px;font-size:11px;line-height:1.35}.cr b{display:block;color:var(--tx);font-weight:600}.cr .r{display:block;color:var(--ac);font-size:10px;letter-spacing:.05em;text-transform:uppercase}footer .cp{margin-top:8px;font-size:11px}
+main{position:relative}main.nor{grid-template-columns:var(--lw,260px) 1fr}main.nor aside.r{display:none}
+.gh{position:absolute;top:0;bottom:0;width:9px;cursor:col-resize;z-index:5;touch-action:none}.gh::after{content:'';position:absolute;top:50%;left:3px;width:3px;height:36px;margin-top:-18px;border-radius:2px;background:var(--bd);opacity:0;transition:opacity .15s}.gh:hover::after,.gh.on::after,.gh:focus-visible::after{opacity:1;background:var(--ac)}
+#gl{left:calc(var(--lw,260px) - 4px)}#gr{right:calc(var(--rw,300px) - 4px)}main.nor #gr{display:none}
+.x{padding:0 7px;line-height:20px;font-size:16px;border-radius:6px}#rshow{position:absolute;right:10px;top:10px;z-index:4}
+body.pm .gh,body.pm #rshow{display:none}
+aside.r{padding:8px 10px}aside.r button,aside.r select,aside.r input[type=text]{font-size:12px;padding:3px 7px;border-radius:6px;margin-bottom:0}aside.r label{font-size:12px;color:var(--mu)}aside.r .kv{font-size:12px}
+details.sec{margin-top:10px}
+.tg{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:4px;margin-top:4px}.tg>*{width:auto;margin:0}.mt{margin-top:4px}
+

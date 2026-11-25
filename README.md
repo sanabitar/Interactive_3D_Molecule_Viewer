@@ -13,15 +13,22 @@ Run with `--real-cdn` on a networked machine for the real engine. **Still requir
 
 ## v2.0 layout
 ```
-laura-viewer.html    viewer (project root: viewer_parity reads it)
+index.html           the page: markup only (open it directly, or use Run LAURA.bat)
+css/                 9 stylesheets, loaded in a fixed order (later rules override earlier ones)
+js/                  the application: classic scripts in a fixed load order (see docs/ARCHITECTURE.md)
+  foundation/        constants, the molecule library, Core (parsers, bonds, analysis)
+  viewer/            three.js scene, display options, build(), labels, picking, chains
+  app/ tools/ ui/    loading, session, imports, export | analysis dialogs, 2D view, compare, help | panels, header, lightbox
+  main.js            wiring and START-UP (loaded last)
+  generated/         hydrogens.js, layout2d.js, labs.js: BUILT from src/ by tools/build_viewer.mjs (do not edit)
 src/core/            pure logic (parsers, analysis, labs' cores, layout2d.mjs = 2D structure diagrams, hydrogens.mjs = valence-based H placement)
 src/labs/            lab UIs: mirror, bond rotation (+ energy panel), sugar, chair, electron
-tests/               *.test.mjs (npm test), fixtures/, browser/ (Playwright), blender_mock_check.py, perf_import.py
-tools/               make_fixtures.mjs, fetch_real_fixtures.sh
-docs/                VERSION-1.4 to 1.7, MERGE_NOTES, readme updates, archive/
+tests/               *.test.mjs (npm test), helpers/, fixtures/, browser/ (Playwright), blender_mock_check.py, perf_import.py
+tools/               build_viewer.mjs, make_fixtures.mjs, fetch_real_fixtures.sh
+docs/                ARCHITECTURE.md, VERSION-*.md, MERGE_NOTES, readme updates, archive/
 ```
-`node tools/build_viewer.mjs` regenerates the inlined labs, `layout2d.mjs` and `hydrogens.mjs` inside `laura-viewer.html` after you edit them in `src/`.
-The labs are ES modules, so open the page through a server (`Run LAURA.bat`). For the browser suite: run `python3 -m http.server 8799` in the project root, then `LAURA_URL=http://127.0.0.1:8799/laura-viewer.html python3 tests/browser/run_browser_tests.py`.
+After editing `src/core/hydrogens.mjs`, `src/core/layout2d.mjs` or anything in `src/labs/`, run `npm run build` (`node tools/build_viewer.mjs`); `npm test` fails if a generated file is stale.
+There is no bundler: `index.html` loads plain classic scripts, so it also works when opened from disk (file://). For the browser suite: `python3 tests/browser/run_browser_tests.py` (defaults to `file://` of `index.html`), or run `python3 -m http.server 8799` in the project root and set `LAURA_URL=http://127.0.0.1:8799/index.html`.
 
 2D view: a generated structure diagram (rings as regular polygons, fused rings, zigzag chains, substituents outward; no stereochemistry; bridged/spiro systems and >80 heavy atoms fall back to the flat projection). The page's inlined copy of `layout2d.mjs` is checked by `tests/layout2d.test.mjs`.
 

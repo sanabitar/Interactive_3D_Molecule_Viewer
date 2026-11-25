@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
 import * as analysis from '../src/core/analysis.mjs';import {peptide} from '../src/core/build.mjs';import * as models from '../src/core/models.mjs';
 // The viewer inlines the core modules. This guards against the inlined copy drifting from src/core.
-const html=fs.readFileSync(new URL('../laura-viewer.html',import.meta.url),'utf8');
+const html=fs.readFileSync(new URL('../js/foundation/core.js',import.meta.url),'utf8');   // the viewer's copy of the core modules
 const i=html.indexOf('const Core=(()=>{'),j=html.indexOf('})();',html.indexOf('return{parsePDB,'))+5;
 const Core=new Function(html.slice(i,j)+';return Core')();
 const MAP=a=>({...a,element:a.el,resName:a.res,resSeq:a.resi,hetero:false,iCode:''});

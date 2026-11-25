@@ -1,0 +1,6 @@
+/* css/theme.css: Colour variables for the light and dark themes (dark follows the OS unless the Dark/Light Mode button was used).
+   Rule ORDER matters across the css/ files (later rules override earlier ones); index.html loads them in this order. */
+
+:root{--bg:#f3f5f3;--sf:#fff;--bd:#dde1dd;--tx:#18201a;--mu:#5b665d;--ac:#0b6b3a;--vp:#eef2ef;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0d100e;--sf:#171b18;--bd:#2c332e;--tx:#e8ede9;--mu:#9aa69c;--ac:#3fbf7a;--vp:#101412;color-scheme:dark}}
+:root[data-theme=dark]{--bg:#0d100e;--sf:#171b18;--bd:#2c332e;--tx:#e8ede9;--mu:#9aa69c;--ac:#3fbf7a;--vp:#101412;color-scheme:dark}

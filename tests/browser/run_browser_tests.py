@@ -3,13 +3,14 @@
 Default: Three.js is replaced by tests/browser/three_shim.js (no network needed) => DOM/CSS/JS/logic are real, 3D rendering is NOT exercised.
 With network: python3 run_browser_tests.py --real-cdn  (uses the page's real CDN scripts; software WebGL may still be limited headless).
 Usage: python3 tests/browser/run_browser_tests.py [--page PATH] [--out results.json]
-The labs are ES modules, so serve the project first: python3 -m http.server 8799 (in the project root) and set LAURA_URL=http://127.0.0.1:8799/laura-viewer.html"""
+The page is plain classic scripts, so it also runs from disk (default: file:// of index.html in the project root).
+To test over HTTP instead: python3 -m http.server 8799 (in the project root) and set LAURA_URL=http://127.0.0.1:8799/index.html"""
 import sys,os,re,json,zipfile,py_compile,tempfile,traceback
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 HERE=Path(__file__).parent;FX=HERE.parent/'fixtures'
 args=sys.argv[1:];REAL='--real-cdn' in args
-PAGE=Path(args[args.index('--page')+1]) if '--page' in args else Path('/mnt/user-data/outputs/laura-viewer.html')
+PAGE=Path(args[args.index('--page')+1]) if '--page' in args else Path(__file__).resolve().parents[2]/'index.html'
 OUT=Path(args[args.index('--out')+1]) if '--out' in args else HERE/'results.json'
 JSZIP=next((p for p in ['/home/claude/.npm-global/lib/node_modules/docx/node_modules/jszip/dist/jszip.min.js'] if os.path.exists(p)),None)
 SHIM=(HERE/'three_shim.js').read_text()
