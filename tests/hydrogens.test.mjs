@@ -51,6 +51,6 @@ test('drawn orders/charges: carboxylate shown as C=O plus C-O-, 4-coordinate N i
 import {validateSession} from '../src/core/session.mjs';
 test('session settings: hydrogens default to hidden and element labels to shown; old sessions stay readable; bad values are rejected',()=>{
  const base={laura:'0.3',structure:{id:'water',name:'Water',builtin:true}},V=o=>validateSession(JSON.stringify(o));
- let r=V(base);assert.equal(r.ok,true);assert.equal(r.session.settings.hydrogens,false);assert.equal(r.session.settings.elements,true);
+ let r=V(base);assert.equal(r.ok,true);assert.equal(r.session.settings.hydrogens,false);assert.equal(r.session.settings.elements,true);assert.equal(r.session.settings.lonepairs,false,'lone pairs default to hidden');
  r=V({...base,settings:{hydrogens:true,elements:false}});assert.equal(r.session.settings.hydrogens,true);assert.equal(r.session.settings.elements,false);
- r=V({...base,settings:{elements:'yes'}});assert.equal(r.ok,false);assert.match(r.error,/elements/)});
+ r=V({...base,settings:{elements:'yes'}});assert.equal(r.ok,false);assert.match(r.error,/elements/);r=V({...base,settings:{lonepairs:true}});assert.equal(r.session.settings.lonepairs,true);r=V({...base,settings:{lonepairs:1}});assert.equal(r.ok,false);assert.match(r.error,/lonepairs/)});

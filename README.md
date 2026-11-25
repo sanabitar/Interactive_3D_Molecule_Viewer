@@ -20,8 +20,8 @@ js/                  the application: classic scripts in a fixed load order (see
   viewer/            three.js scene, display options, build(), labels, picking, chains
   app/ tools/ ui/    loading, session, imports, export | analysis dialogs, 2D view, compare, help | panels, header, lightbox
   main.js            wiring and START-UP (loaded last)
-  generated/         hydrogens.js, layout2d.js, labs.js: BUILT from src/ by tools/build_viewer.mjs (do not edit)
-src/core/            pure logic (parsers, analysis, labs' cores, layout2d.mjs = 2D structure diagrams, hydrogens.mjs = valence-based H placement)
+  generated/         hydrogens.js, lonepairs.js, layout2d.js, labs.js: BUILT from src/ by tools/build_viewer.mjs (do not edit)
+src/core/            pure logic (parsers, analysis, labs' cores, layout2d.mjs = 2D structure diagrams, hydrogens.mjs = valence-based H placement, lonepairs.mjs = lone-pair counts and directions)
 src/labs/            lab UIs: mirror, bond rotation (+ energy panel), sugar, chair, electron
 tests/               *.test.mjs (npm test), helpers/, fixtures/, browser/ (Playwright), blender_mock_check.py, perf_import.py
 tools/               build_viewer.mjs, make_fixtures.mjs, fetch_real_fixtures.sh
@@ -35,3 +35,5 @@ There is no bundler: `index.html` loads plain classic scripts, so it also works 
 Hydrogens (v2.0): hidden by default; **Show hydrogens** (Display Options), the H button and the H key show them as bonded spheres in 3D and as bonded H atoms in 2D (hidden, 2D writes OH, NH₂, NH₃⁺ on the atom). Hiding never removes them from the structure. **Element labels** (on by default) write the element symbol on each atom sphere, sized to the sphere and decluttered. `tests/library.test.mjs` checks the hydrogen count and connectivity of all 43 built-in molecules.
 
 Viewer controls (v2.0): the details panel starts closed; the panel icon at the top right of the viewer opens and closes it. The view button at the top left toggles Ball and stick / Chains (the only two views). Element labels are drawn per atom with `transform` and debounced so they do not flicker while rotating.
+
+Lone pairs (v2.0): **Show lone pairs** (Display Options, off by default) draws lone electron pairs in Ball and stick view as translucent purple lobes with two electron dots; they are not atoms. Counts come from valence (water O 2, ammonia N 1, carbonyl O 2, amine N 1), directions from the real geometry (tetrahedral, in-plane for C=O and pyridine N, perpendicular to the plane for aniline/amide N), and atoms that look short of bonds are skipped rather than guessed. `tests/lonepairs.test.mjs` checks every built-in molecule against its Lewis structure.

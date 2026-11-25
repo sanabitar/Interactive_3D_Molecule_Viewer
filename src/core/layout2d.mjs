@@ -84,12 +84,14 @@ const subscript=n=>String(n).split('').map(c=>SUBS[+c]).join('');
 export function atomLabelParts(el,nH=0,charge=0,hLeft=false){const h=nH?'H'+(nH>1?subscript(nH):''):'',mag=Math.abs(charge),ch=charge?(mag>1?String(mag).split('').map(c=>SUPS[+c]).join(''):'')+(charge>0?'⁺':'⁻'):'';
  return hLeft?{pre:h,sym:el,post:ch}:{pre:'',sym:el,post:h+ch}}
 // Bond orders and charges as they should be DRAWN. A delocalised carboxylate (two terminal O on one C, both order 1.5) is shown the usual way:
-// one C=O and one C-O-; 4-coordinate N is N+. Nothing else is guessed (a bare single-bonded O may just be an OH whose H is missing from the file).
+// one C=O and one C-O-; a delocalised group with an O-H (protonated acid) is shown as C=O and C-OH; 4-coordinate N is N+. Nothing else is guessed (a bare single-bonded O may just be an OH whose H is missing from the file).
 // Returns {orders, charge: Map(atom -> charge)}.
 export function drawnOrdersAndCharges(atoms,bonds,orders){
  const el=i=>atoms[i].el||atoms[i].element,adj=atoms.map(()=>[]),out=[...orders],charge=new Map();
  bonds.forEach(([a,b],k)=>{adj[a].push([b,k]);adj[b].push([a,k])});
- atoms.forEach((_,c)=>{if(el(c)!=='C')return;const t=adj[c].filter(([o,k])=>el(o)==='O'&&adj[o].length===1&&orders[k]===1.5);
+ atoms.forEach((_,c)=>{if(el(c)!=='C')return;const t=adj[c].filter(([o,k])=>el(o)==='O'&&adj[o].length===1&&orders[k]===1.5),
+  h=adj[c].filter(([o,k])=>el(o)==='O'&&adj[o].length===2&&adj[o].some(([x])=>el(x)==='H')&&orders[k]===1.5);   // O-H carrying a delocalised bond
+  if(t.length>=1&&h.length>=1){out[t[0][1]]=2;out[h[0][1]]=1;return}       // protonated carboxylic acid (a C-terminus with its OXT-H): C=O and C-OH
   if(t.length>=2){out[t[0][1]]=2;out[t[1][1]]=1;charge.set(t[1][0],-1)}});
  atoms.forEach((_,i)=>{if(el(i)==='N'&&adj[i].length===4)charge.set(i,1)});
  return{orders:out,charge}}

@@ -15,6 +15,7 @@ for(const[i,j,ob]of B){const sh=SH[ob]||SH[1],u=sh.length>1?offDir(i,j):[0,0,0];
 if(seg.length){const cm=new THREE.InstancedMesh(new THREE.CylinderGeometry(1,1,1,10),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.45}),seg.length*2),up=new THREE.Vector3(0,1,0);let n=0;
 for(const[i,j,f,rs]of seg){const a=A[i],b=A[j],p=new THREE.Vector3(a.x+f[0],a.y+f[1],a.z+f[2]).sub(cen),q=new THREE.Vector3(b.x+f[0],b.y+f[1],b.z+f[2]).sub(cen),d=q.clone().sub(p),L=d.length(),mid=p.clone().add(q).multiplyScalar(.5);o.quaternion.setFromUnitVectors(up,d.normalize());o.scale.set((br||.1)*rs,L/2,(br||.1)*rs);
 o.position.copy(p.clone().add(mid).multiplyScalar(.5));o.updateMatrix();cm.setMatrixAt(n,o.matrix);cm.setColorAt(n++,c.setHex(cpk(a.el)));o.position.copy(mid.clone().add(q).multiplyScalar(.5));o.updateMatrix();cm.setMatrixAt(n,o.matrix);cm.setColorAt(n++,c.setHex(cpk(b.el)))}grp.add(cm)}}
+if(st==='bs')drawLonePairs(inS,R);else lpShown=0;
 drawSel()}
 function offDir(i,j){return offDirG(mol.atoms,mol.adj,i,j)}
 function offDirG(A,adj,i,j){const a=A[i],b=A[j],d=[b.x-a.x,b.y-a.y,b.z-a.z],L=Math.hypot(...d);d[0]/=L;d[1]/=L;d[2]/=L;

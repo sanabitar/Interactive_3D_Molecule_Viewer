@@ -410,6 +410,41 @@ def _(pw):
         ok(r['churn']<limit,'%s: %.1f%% of labels appear/vanish per frame at 1 degree/frame (limit %.1f; the old algorithm gave 6-10%%)'%(mid,r['churn'],limit));ok(r['fs']<.25,'%s: label sizes jump (mean change %.2f px/frame)'%(mid,r['fs']));ok(r['n']>20,'%s: too few labels (%d)'%(mid,r['n']))
     ok(pg.evaluate("[...document.querySelectorAll('#elb .el')].every(n=>n.style.left===''&&n.style.top===''&&n.style.transform.startsWith('translate('))"),'labels must be positioned with transform only, not left/top (no layout work per frame)')
     pg.uncheck('#el');pg.wait_for_timeout(150);ok(pg.evaluate("[...document.querySelectorAll('#elb .el')].every(n=>n.style.opacity==='0')"),'unticking fades every label out');pg.wait_for_timeout(700);ok(pg.evaluate("document.querySelectorAll('#elb .el').length")==0,'faded labels are removed from the page');pg._b.close()
+LPS="grp.children.filter(c=>c.userData&&c.userData.lp).reduce((n,c)=>n+c.userData.lp,0)"
+LPDOTS="grp.children.filter(c=>c.userData&&c.userData.lpDots).reduce((n,c)=>n+c.userData.lpDots,0)"
+@case('60 lone pairs: "Show lone pairs" in Display Options, off by default; water 2, ammonia 1, ethanol 2, formaldehyde 2, glycine 5; independent of hydrogens; never atoms')
+def _(pw):
+    pg=new_page(pw);n=lambda:pg.evaluate(LPS);atoms=lambda:pg.evaluate("lauraMirrorSource().atoms.length")
+    ok(pg.locator('#lp').count()==1 and not pg.is_checked('#lp'),'lone pairs should start hidden')
+    ok(pg.evaluate("document.querySelector('#lp').closest('details').querySelector('summary').textContent.trim()")=='Display Options' and 'Show lone pairs' in pg.inner_text('details.sec:has(#lp)'),'checkbox should be "Show lone pairs" in Display Options')
+    sel_mol(pg,'water','Water');ok(n()==0,'no lobes while hidden');a0=atoms();ab=pg.evaluate(ATOMMESH)
+    pg.check('#lp');pg.wait_for_timeout(150);ok(n()==2,'water should show 2 lone pairs, got %s'%n());ok(pg.evaluate(LPDOTS)==4,'two electron dots per pair')
+    ok(atoms()==a0==3 and pg.evaluate(ATOMMESH)==ab,'lone pairs must not be atoms: atoms %s -> %s, atom mesh %s -> %s'%(a0,atoms(),ab,pg.evaluate(ATOMMESH)))
+    ok(pg.evaluate("grp.children.filter(c=>c.userData&&c.userData.lp).every(c=>!c.userData.map)"),'lobes must not be in the pickable atom list')
+    ti=pg.evaluate("document.querySelector('#info').textContent");ok('Lone pairs (not atoms): 2' in ti,'details panel should state 2 lone pairs that are not atoms: '+ti[:200])
+    pg.check('#hh');pg.wait_for_timeout(100);ok(n()==2 and atoms()==3,'hydrogens on: still 2 lone pairs');pg.uncheck('#hh');pg.wait_for_timeout(100);ok(n()==2,'hydrogens off: still 2 (they belong to O, not to H)')
+    for mid,name,want in[('ammonia','Ammonia',1),('ethanol','Ethanol',2),('formaldehyde','Formaldehyde',2),('glycine','Glycine (neutral form)',5),('benzene','Benzene',0)]:
+        sel_mol(pg,mid,name);pg.wait_for_timeout(150);ok(n()==want,'%s: expected %d lone pairs, got %s'%(mid,want,n()))
+    pg.uncheck('#lp');pg.wait_for_timeout(100);ok(n()==0,'unticking removes them');pg._b.close()
+@case('61 lone pairs: honest feedback (no lone pairs / schematic model / Chains view), a peptide shows 38, large sizes and selected-only follow the atoms shown')
+def _(pw):
+    pg=new_page(pw);n=lambda:pg.evaluate(LPS);toast=lambda:pg.inner_text('#toast')
+    sel_mol(pg,'benzene','Benzene');pg.check('#lp');pg.wait_for_function("document.querySelector('#toast').textContent.includes('no lone pairs')",timeout=3000)
+    sel_mol(pg,'bdna');pg.wait_for_timeout(100);pg.uncheck('#lp');pg.check('#lp');pg.wait_for_function("document.querySelector('#toast').textContent.toLowerCase().includes('schematic')",timeout=3000);ok(n()==0,'schematic B-DNA has no real atoms')
+    sel_mol(pg,'pep_alpha');pg.wait_for_timeout(200);ok(n()==38,'Ala12: 12 amide N + 12 carbonyl O x 2 + acid group = 38, got %s'%n())
+    pg.check('#hh');pg.wait_for_timeout(100);ok(n()==38,'showing hydrogens does not change it')
+    pg.select_option('#selby','E:N');pg.check('#so');pg.wait_for_timeout(200);ok(n()==12,'selected only (the 12 N): 12 lone pairs, got %s'%n());pg.uncheck('#so')
+    sel_mol(pg,'pep_pair');pg.click('#stb');pg.uncheck('#lp');pg.check('#lp');pg.wait_for_function("document.querySelector('#toast').textContent.includes('Ball and stick')",timeout=3000);ok(n()==0,'Chains view has no atom spheres, so no lobes')
+    pg.click('#stb');pg.wait_for_timeout(200);ok(n()==76,'back in Ball and stick: 2 chains x 38, got %s'%n());pg._b.close()
+@case('62 lone pairs are part of the session (saved and restored); sessions saved before this option load with it off')
+def _(pw):
+    import json,tempfile
+    pg=new_page(pw);n=lambda:pg.evaluate(LPS);sel_mol(pg,'water','Water');pg.check('#lp');pg.wait_for_timeout(100)
+    with pg.expect_download() as d:pg.evaluate("saveSession()")
+    S=json.loads(open(d.value.path()).read());ok(S['settings'].get('lonepairs') is True,'saved settings: %s'%S['settings'])
+    pg.uncheck('#lp');pg.wait_for_timeout(100);ok(n()==0,'off');pg.set_input_files('#sl',d.value.path());pg.wait_for_timeout(600);ok(pg.is_checked('#lp') and n()==2,'restored: checkbox %s, lobes %s'%(pg.is_checked('#lp'),n()))
+    f=tempfile.NamedTemporaryFile('w',suffix='.json',delete=False);json.dump({'laura':'0.3','structure':{'id':'water','name':'Water','builtin':True}},f);f.close()
+    pg.set_input_files('#sl',f.name);pg.wait_for_timeout(600);ok(not pg.is_checked('#lp') and n()==0,'an old session loads with lone pairs off');pg._b.close()
 @case('23 no console errors or failed requests across the whole run')
 def _(pw):ok(not ERRORS,str(ERRORS)[:200])
 

@@ -11,8 +11,8 @@ export function validateSession(text,{maxChars=SESSION_MAX_CHARS}={}){if(typeof 
  const st=S.structure;if(!st||typeof st!=='object')return bad('the "structure" section is missing.');
  if(typeof st.id!=='string'||typeof st.name!=='string')return bad('structure.id and structure.name must be text.');
  if(st.builtin!==true&&typeof st.raw!=='string')return bad(st.rawOmitted?'the structure file was too large to package; re-import the original file.':'the structure file is not packaged and it is not a built-in molecule.');
- const set={style:'bs',hydrogens:false,solvent:true,labels:false,elements:true,...(S.settings||{})};if(!STYLES.includes(set.style))return bad(`unknown display style "${String(set.style).slice(0,20)}".`);
- for(const k of['hydrogens','solvent','labels','elements'])if(typeof set[k]!=='boolean')return bad(`settings.${k} must be true or false.`);
+ const set={style:'bs',hydrogens:false,solvent:true,labels:false,elements:true,lonepairs:false,...(S.settings||{})};if(!STYLES.includes(set.style))return bad(`unknown display style "${String(set.style).slice(0,20)}".`);
+ for(const k of['hydrogens','solvent','labels','elements','lonepairs'])if(typeof set[k]!=='boolean')return bad(`settings.${k} must be true or false.`);
  const sel=S.selection===undefined?[]:S.selection;if(!Array.isArray(sel)||!sel.every(x=>Array.isArray(x)&&x.length===3&&typeof x[0]==='string'&&fin(x[1])&&typeof x[2]==='string'))return bad('selection entries must be [chain, serial, atom name].');
  const con={ligand:'',cutoff:'4.0',annotated:'',source:'',result:null,...(S.contacts||{})};for(const k of['ligand','cutoff','annotated','source'])if(typeof con[k]!=='string')return bad(`contacts.${k} must be text.`);
  if(S.camera!==undefined&&S.camera!==null&&!(S.camera&&vec3(S.camera.p)&&vec3(S.camera.t)))return bad('camera.p and camera.t must be three finite numbers.');

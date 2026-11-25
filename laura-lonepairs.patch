@@ -1,0 +1,673 @@
+diff --git a/README.md b/README.md
+index 79c0cc4..0fc4652 100644
+--- a/README.md
++++ b/README.md
+@@ -20,8 +20,8 @@ js/                  the application: classic scripts in a fixed load order (see
+   viewer/            three.js scene, display options, build(), labels, picking, chains
+   app/ tools/ ui/    loading, session, imports, export | analysis dialogs, 2D view, compare, help | panels, header, lightbox
+   main.js            wiring and START-UP (loaded last)
+-  generated/         hydrogens.js, layout2d.js, labs.js: BUILT from src/ by tools/build_viewer.mjs (do not edit)
+-src/core/            pure logic (parsers, analysis, labs' cores, layout2d.mjs = 2D structure diagrams, hydrogens.mjs = valence-based H placement)
++  generated/         hydrogens.js, lonepairs.js, layout2d.js, labs.js: BUILT from src/ by tools/build_viewer.mjs (do not edit)
++src/core/            pure logic (parsers, analysis, labs' cores, layout2d.mjs = 2D structure diagrams, hydrogens.mjs = valence-based H placement, lonepairs.mjs = lone-pair counts and directions)
+ src/labs/            lab UIs: mirror, bond rotation (+ energy panel), sugar, chair, electron
+ tests/               *.test.mjs (npm test), helpers/, fixtures/, browser/ (Playwright), blender_mock_check.py, perf_import.py
+ tools/               build_viewer.mjs, make_fixtures.mjs, fetch_real_fixtures.sh
+@@ -35,3 +35,5 @@ There is no bundler: `index.html` loads plain classic scripts, so it also works
+ Hydrogens (v2.0): hidden by default; **Show hydrogens** (Display Options), the H button and the H key show them as bonded spheres in 3D and as bonded H atoms in 2D (hidden, 2D writes OH, NH₂, NH₃⁺ on the atom). Hiding never removes them from the structure. **Element labels** (on by default) write the element symbol on each atom sphere, sized to the sphere and decluttered. `tests/library.test.mjs` checks the hydrogen count and connectivity of all 43 built-in molecules.
+ 
+ Viewer controls (v2.0): the details panel starts closed; the panel icon at the top right of the viewer opens and closes it. The view button at the top left toggles Ball and stick / Chains (the only two views). Element labels are drawn per atom with `transform` and debounced so they do not flicker while rotating.
++
++Lone pairs (v2.0): **Show lone pairs** (Display Options, off by default) draws lone electron pairs in Ball and stick view as translucent purple lobes with two electron dots; they are not atoms. Counts come from valence (water O 2, ammonia N 1, carbonyl O 2, amine N 1), directions from the real geometry (tetrahedral, in-plane for C=O and pyridine N, perpendicular to the plane for aniline/amide N), and atoms that look short of bonds are skipped rather than guessed. `tests/lonepairs.test.mjs` checks every built-in molecule against its Lewis structure.
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index b9a79bd..6fc06d3 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -8,7 +8,7 @@ Browsers refuse to load ES modules from `file://`, and LAURA is meant to work wh
+ ## Rules that keep it working
+ 1. **Load order is part of the code.** A file may use anything defined in an *earlier* file at load time; anything may be used by functions *called later* (after start-up). The order is the order of the `<script>` tags in `index.html`, listed below. `tests/structure.test.mjs` checks the key constraints.
+ 2. **Files only define things. `js/main.js` starts them.** The render loop (`renderLoop`) and the saved-imports restore (`restoreSavedImports`) are defined in `viewer/picking.js` and `app/imports.js` and started from `main.js`, the last app script. Do not start a loop, observer or timer at the top level of any other file.
+-3. **`js/generated/*` are built, not edited.** They come from `src/` (`hydrogens.mjs`, `layout2d.mjs`, and the labs with the cores they import) via `npm run build`. `npm test` fails if one is stale. Edit the file in `src/`, then rebuild.
++3. **`js/generated/*` are built, not edited.** They come from `src/` (`hydrogens.mjs`, `lonepairs.mjs`, `layout2d.mjs`, and the labs with the cores they import) via `npm run build`. `npm test` fails if one is stale. Edit the file in `src/`, then rebuild.
+ 4. **CSS order matters.** Several selectors (for example `.it` and `aside.r`) are defined more than once and later rules deliberately override earlier ones. The `<link>` order in `index.html` is the original rule order; do not reorder.
+ 5. **No inline code in `index.html`** (no `<script>` body, `<style>` or `onclick=`); a test enforces it.
+ 
+@@ -30,35 +30,37 @@ Browsers refuse to load ES modules from `file://`, and LAURA is meant to work wh
+ |---|---|---|---|
+ | 1 | `js/foundation/constants.js` | 0.9 KB | Shared constants and helpers: $ (querySelector), element colours and radii (CPK, VDW, COV), toast(), esc(). Loaded first. |
+ | 2 | `js/generated/hydrogens.js` | 6.4 KB | GENERATED from src/core/hydrogens.mjs. Do not edit. |
+-| 3 | `js/foundation/library.js` | 22.2 KB | The built-in molecule library (43 entries in LIB) and the `imported` list of user-added structures. |
+-| 4 | `js/foundation/core.js` | 40.0 KB | Core: parsers, bond perception, analysis, models and sessions, plus parseFile() and computeBonds(). |
+-| 5 | `js/viewer/scene.js` | 2.8 KB | three.js scene: renderer, camera, orbit controls, lighting, and the shared viewer state (mol, sel, vis, ...). |
+-| 6 | `js/viewer/display-options.js` | 1.8 KB | Toolbar toggles: the view button (ball and stick / chains) and the hydrogens switch (setH). |
+-| 7 | `js/viewer/molecule-render.js` | 3.3 KB | build(): turns the current molecule into spheres, bonds and (in Chains view) tubes, applying the display options. |
+-| 8 | `js/viewer/labels.js` | 6.8 KB | Label layer: element symbols on atom spheres (debounced so they do not flicker), atom-name labels, chain and contact tags, |
+-| 9 | `js/generated/layout2d.js` | 9.3 KB | GENERATED from src/core/layout2d.mjs. Do not edit. |
+-| 10 | `js/tools/view2d.js` | 8.2 KB | The 2D view dialog: generated structure diagram (uses Layout2D) or a flat projection of the 3D coordinates. |
+-| 11 | `js/viewer/chains-and-selection.js` | 2.8 KB | Chains view (tubes along the CA/P trace) and the selection highlight (drawSel0). |
+-| 12 | `js/viewer/picking.js` | 1.8 KB | Mouse picking and the hover tooltip, and the render loop. renderLoop() is only defined here; main.js starts it. |
+-| 13 | `js/app/loading.js` | 3.6 KB | Loading a molecule: the loading/error overlay, load(), the details panel (info) and the bond-order summary. |
+-| 14 | `js/app/library-list.js` | 3.0 KB | The molecule list and menu (search, sort, categories) and opening a local file (addFile). |
+-| 15 | `js/app/ligand-contacts.js` | 2.7 KB | Ligand contacts: list ligands, find the residues in contact, show, copy and export them. |
+-| 16 | `js/app/rcsb.js` | 3.0 KB | Fetching from RCSB: metadata, text search and downloading a structure by ID. |
+-| 17 | `js/ui/modal.js` | 1.1 KB | Modal dialog helper (modal(), focus trap) and need(), which asks for a structure to be loaded first. |
+-| 18 | `js/tools/tool-docs.js` | 4.4 KB | Title, icon and short description of each analysis tool (TD), and tdoc(), the header card its dialog shows. |
+-| 19 | `js/tools/analysis-tools.js` | 7.8 KB | Analysis dialogs: Ramachandran plot, contact map and sequence alignment (and the Labels checkbox). |
+-| 20 | `js/app/session.js` | 2.7 KB | Saving and restoring a session (structure, selection, camera, display settings). |
+-| 21 | `js/tools/teaching.js` | 1.0 KB | The guided "measure water" activity. |
+-| 22 | `js/tools/compare-and-rmsd.js` | 11.1 KB | Comparison overlays: Compare molecules (table and side-by-side) and Superposition & RMSD. |
+-| 23 | `js/tools/help.js` | 9.9 KB | Help and Analysis-guide text, and the tooltips of the toolbar and panel buttons. |
+-| 24 | `js/ui/panels.js` | 1.9 KB | Resizable library/details panels (widths are remembered) and the details-panel toggle (the panel starts closed). |
+-| 25 | `js/ui/header.js` | 2.3 KB | Header controls: the INFO card, fullscreen, and the Dark/Light Mode button. |
+-| 26 | `js/ui/lightbox.js` | 3.1 KB | Closing dialogs on outside click, the enlarge-a-diagram lightbox (zoom and pan), and the 2D view button. |
+-| 27 | `js/app/imports.js` | 3.3 KB | Imported structures: rename, save in this browser (IndexedDB), remove. restoreSavedImports() is started from main.js. |
+-| 28 | `js/app/export.js` | 5.3 KB | Downloads: XYZ and the Blender package (including the generated Blender import script). |
+-| 29 | `js/main.js` | 4.9 KB | Wiring and START-UP: theme, keyboard shortcuts and the remaining buttons. Loaded last; the only file that starts work at load. |
+-| 30 | `js/app/mirror-source.js` | 0.3 KB | Hands the current molecule to the Mirror lab (generated/labs.js reads window.lauraMirrorSource). |
+-| 31 | `js/generated/labs.js` | 61.8 KB | GENERATED from src/labs/*.mjs and the src/core modules they import. Do not edit. |
++| 3 | `js/generated/lonepairs.js` | 5.7 KB | GENERATED from src/core/lonepairs.mjs. Do not edit. |
++| 4 | `js/foundation/library.js` | 22.2 KB | The built-in molecule library (43 entries in LIB) and the `imported` list of user-added structures. |
++| 5 | `js/foundation/core.js` | 40.0 KB | Core: parsers, bond perception, analysis, models and sessions, plus parseFile() and computeBonds(). |
++| 6 | `js/viewer/scene.js` | 2.8 KB | three.js scene: renderer, camera, orbit controls, lighting, and the shared viewer state (mol, sel, vis, ...). |
++| 7 | `js/viewer/display-options.js` | 1.8 KB | Toolbar toggles: the view button (ball and stick / chains) and the hydrogens switch (setH). |
++| 8 | `js/viewer/molecule-render.js` | 3.4 KB | build(): turns the current molecule into spheres, bonds and (in Chains view) tubes, applying the display options. |
++| 9 | `js/viewer/lone-pairs.js` | 3.2 KB | Lone electron pairs drawn as translucent purple lobes with two electron dots (not atoms: not in mol.atoms, not pickable, not counted). |
++| 10 | `js/viewer/labels.js` | 6.8 KB | Label layer: element symbols on atom spheres (debounced so they do not flicker), atom-name labels, chain and contact tags, |
++| 11 | `js/generated/layout2d.js` | 9.6 KB | GENERATED from src/core/layout2d.mjs. Do not edit. |
++| 12 | `js/tools/view2d.js` | 8.2 KB | The 2D view dialog: generated structure diagram (uses Layout2D) or a flat projection of the 3D coordinates. |
++| 13 | `js/viewer/chains-and-selection.js` | 2.8 KB | Chains view (tubes along the CA/P trace) and the selection highlight (drawSel0). |
++| 14 | `js/viewer/picking.js` | 1.8 KB | Mouse picking and the hover tooltip, and the render loop. renderLoop() is only defined here; main.js starts it. |
++| 15 | `js/app/loading.js` | 3.7 KB | Loading a molecule: the loading/error overlay, load(), the details panel (info) and the bond-order summary. |
++| 16 | `js/app/library-list.js` | 3.0 KB | The molecule list and menu (search, sort, categories) and opening a local file (addFile). |
++| 17 | `js/app/ligand-contacts.js` | 2.7 KB | Ligand contacts: list ligands, find the residues in contact, show, copy and export them. |
++| 18 | `js/app/rcsb.js` | 3.0 KB | Fetching from RCSB: metadata, text search and downloading a structure by ID. |
++| 19 | `js/ui/modal.js` | 1.1 KB | Modal dialog helper (modal(), focus trap) and need(), which asks for a structure to be loaded first. |
++| 20 | `js/tools/tool-docs.js` | 4.5 KB | Title, icon and short description of each analysis tool (TD), and tdoc(), the header card its dialog shows. |
++| 21 | `js/tools/analysis-tools.js` | 7.8 KB | Analysis dialogs: Ramachandran plot, contact map and sequence alignment (and the Labels checkbox). |
++| 22 | `js/app/session.js` | 2.8 KB | Saving and restoring a session (structure, selection, camera, display settings). |
++| 23 | `js/tools/teaching.js` | 1.0 KB | The guided "measure water" activity. |
++| 24 | `js/tools/compare-and-rmsd.js` | 11.1 KB | Comparison overlays: Compare molecules (table and side-by-side) and Superposition & RMSD. |
++| 25 | `js/tools/help.js` | 10.7 KB | Help and Analysis-guide text, and the tooltips of the toolbar and panel buttons. |
++| 26 | `js/ui/panels.js` | 1.9 KB | Resizable library/details panels (widths are remembered) and the details-panel toggle (the panel starts closed). |
++| 27 | `js/ui/header.js` | 2.3 KB | Header controls: the INFO card, fullscreen, and the Dark/Light Mode button. |
++| 28 | `js/ui/lightbox.js` | 3.1 KB | Closing dialogs on outside click, the enlarge-a-diagram lightbox (zoom and pan), and the 2D view button. |
++| 29 | `js/app/imports.js` | 3.3 KB | Imported structures: rename, save in this browser (IndexedDB), remove. restoreSavedImports() is started from main.js. |
++| 30 | `js/app/export.js` | 5.3 KB | Downloads: XYZ and the Blender package (including the generated Blender import script). |
++| 31 | `js/main.js` | 4.9 KB | Wiring and START-UP: theme, keyboard shortcuts and the remaining buttons. Loaded last; the only file that starts work at load. |
++| 32 | `js/app/mirror-source.js` | 0.3 KB | Hands the current molecule to the Mirror lab (generated/labs.js reads window.lauraMirrorSource). |
++| 33 | `js/generated/labs.js` | 61.8 KB | GENERATED from src/labs/*.mjs and the src/core modules they import. Do not edit. |
+ 
+ `foundation/core.js` is a hand-maintained copy of the pure modules in `src/core`; `tests/viewer_parity.test.mjs` fails if its behaviour drifts from `src/core`.
+ 
+@@ -72,6 +74,7 @@ Browsers refuse to load ES modules from `file://`, and LAURA is meant to work wh
+ |---|---|
+ | helpers at the top (`$`, CPK, VDW, `toast`) | `foundation/constants.js` (`esc` moved here too) |
+ | hydrogens (inlined block) | `generated/hydrogens.js` |
++| lone pairs (new) | `generated/lonepairs.js` (counts and directions), `viewer/lone-pairs.js` (drawing) |
+ | library | `foundation/library.js` |
+ | parsers & validation (the `Core` object) | `foundation/core.js` |
+ | measurements, three.js scene | `viewer/scene.js`, `viewer/display-options.js`, `viewer/molecule-render.js` (`build`) |
+diff --git a/docs/VERSION-v2.0.md b/docs/VERSION-v2.0.md
+index 52a2030..e794b67 100644
+--- a/docs/VERSION-v2.0.md
++++ b/docs/VERSION-v2.0.md
+@@ -35,7 +35,7 @@ v2.0 covers two things: hydrogens (a proper Show hydrogens option and complete h
+ ## Project
+ - New `src/core/hydrogens.mjs`; `src/core/layout2d.mjs` gained explicit-H placement, label text and charge helpers; `src/core/session.mjs` has the new `elements` setting and the hydrogens-off default.
+ - `node tools/build_viewer.mjs` writes `js/generated/hydrogens.js`, `layout2d.js` and `labs.js` from `src/` (see the next section). Run it after editing `hydrogens.mjs`, `layout2d.mjs` or `src/labs`.
+-- **Tests:** 159 Node tests pass (58 new). The browser suite has 54 of 59 passing, with new or rewritten cases 44, 50-59 and updates to 02, 04, 36, 39, 41, 43. The browser tests open the details panel first (it starts closed); test 57 covers the closed default.
++- **Tests:** 217 Node tests pass. The browser suite has 57 of 62 passing, with new or rewritten cases 44, 50-62 and updates to 02, 04, 36, 39, 41, 43. The browser tests open the details panel first (it starts closed); test 57 covers the closed default.
+ 
+ ## 5. Project structure: the single HTML file is split
+ `laura-viewer.html` (300 KB with inline CSS and three inline scripts) is now `index.html` (52 KB, markup only) plus `css/` (9 files) and `js/` (31 files). The layout, load order and rules are in `docs/ARCHITECTURE.md`.
+@@ -44,9 +44,19 @@ v2.0 covers two things: hydrogens (a proper Show hydrogens option and complete h
+ - **Three deliberate code changes**, all about start-up: the render loop and the "restore saved imports" call now start from `js/main.js` instead of during load (`renderLoop`, `restoreSavedImports`), and `esc()` moved into `constants.js`. This is a precaution (with many script files a frame or callback could in principle fire between two of them); I could not make the old order fail in testing.
+ - `tools/build_viewer.mjs` now writes the generated files (it no longer edits the HTML); `--check` verifies they are current. New tests: `tests/structure.test.mjs`, `tests/generated.test.mjs`.
+ 
++## 6. Lone electron pairs
++- **Show lone pairs** (Display Options, **off by default**; saved in sessions) draws each lone pair in Ball and stick view as a translucent purple lobe with two white electron dots, so it cannot be mistaken for an atom (solid CPK colours) or a bond (grey cylinders). **They are not atoms:** they are not in the structure, are not pickable, selectable or measurable, and do not change any atom count. The details panel states "Lone pairs (not atoms): N".
++- **How many (from valence):** lone pairs = (valence electrons - charge - bond-order sum) / 2, for N, O, S, P, Se and the halogens. Water O 2, ammonia N 1, amine N 1, alcohol/ether O 2, carbonyl O 2, thiol/H2S S 2, halide 3, N2 / HCN N / CO 1 each (CO's carbon too). Charges are read off the structure the same way the 2D diagram does (NH3+ has none; carboxylate O- has 3).
++- **Where (from the real geometry, i.e. electron-region geometry):** tetrahedral for sp3 atoms (water, alcohols, ethers, amines, ammonia: the lobes point away from the substituents); in the molecular plane at 120 degrees for a carbonyl O or a pyridine N; perpendicular to the plane for a lone pair conjugated with a pi system (aniline or amide N, phenol O: a "p" lone pair, drawn on one face); straight away from the bond for linear atoms.
++- **Never guessed:** an atom that looks short of bonds (usually because hydrogens are missing from the file) gets no lone pair, so a missing N-H cannot appear as a lone pair; without any hydrogens, delocalised ring atoms are skipped too (a ring N could be pyridine-type or N-H). A lone pair that is part of an aromatic pi system (imidazole's N-H, pyrrole, furan's second pair) is not shown.
++- **Verified:** `tests/lonepairs.test.mjs` (46 tests) checks every built-in molecule against its Lewis structure written out by hand (31 small molecules; peptide models 3n+2 per chain; B-DNA is schematic) and the geometry with real angles (water LP-O-H and LP-O-LP ~109 degrees and opposite the hydrogens; ammonia opposite the three N-H; formaldehyde in plane at 120 degrees; aniline perpendicular to the ring; ...). Four deliberately injected bugs are each caught. Browser tests 60-62 cover the toggle, the counts in the scene, "not atoms", independence from the hydrogen switch, the notices and session round trip.
++- **Needed one fix elsewhere:** the shared "as drawn" helper (`drawnOrdersAndCharges` in `layout2d.mjs`) now shows a delocalised group that carries an O-H as a protonated acid (C=O and C-OH). The peptide models' C-terminus (COOH) had been read as a carboxylate; the 2D diagram benefits as well.
++- New files: `src/core/lonepairs.mjs` (-> `js/generated/lonepairs.js`) and `js/viewer/lone-pairs.js` (drawing).
++
+ ## Limits
+ - **3D rendering could not be exercised here:** the browser suite runs on a Three.js stand-in, so the label *logic* (which symbols, where, how big, overlap, zoom) is tested and its alignment was checked against an independent perspective calculation, but it has not been seen on the real renderer. Please look at it once in a browser; the thresholds (`EL_ON_PX`, `EL_OFF_PX`, `EL_SHOW`, `EL_HIDE`, `EL_CAP`, `EL_MAX_ATOMS` near `elementLabels` in the viewer) are one-line changes. The flicker fix was measured, not seen: I could not reproduce your exact glitch on the real renderer, so if labels still misbehave, tell me what you see (flicker, wrong position, overlap, wrong size).
+ - Peptide models are larger now (Ala₁₂ has 123 atoms, not 60): with hydrogens hidden you see 61 atoms. The Mirror and Bond-rotation labs limit molecules to 80 atoms and use the whole molecule (hydrogens included), so they decline the longer peptides; the 3D labs do not follow the Hydrogens switch.
+ - Hidden hydrogens in 2D are only counted from hydrogen atoms that exist in the data; the app does not invent hydrogens for heavy-atom-only imports.
+ - A symbol sits on the sphere centre, so it can be partly covered where another atom's sphere overlaps its edge; that is a normal consequence of overlapping spheres. A label that has just become hidden or overlapped can linger for up to about 0.2 s (it fades), by design.
+ - **Browser suite:** 5 cases fail exactly as they did in v1.9 (11, 20: they look for a "Teaching, session" section that v1.9 renamed; 39; 46: expects the white outline v1.9 removed; 47). Because test 11 is stale, the session round trip was checked by hand instead (hydrogens and element-label choices survive save and reload; sessions without the new fields load with hydrogens hidden and labels on). `tests/blender_mock_check.py` hits the same stale section name. None of these relate to this work.
++- **Lone pairs:** the 3D lobes (size, colour, translucency) were checked against an independent projection of the page's data, not on the real renderer; the constants are at the top of `js/viewer/lone-pairs.js` and `drawLonePairs`. Lone pairs are not drawn in the 2D diagram or in Chains view, and not for structures over 6,000 atoms. A conjugated (p) lone pair is drawn as one lobe on one face of the plane, not as a two-lobed p orbital.
+diff --git a/index.html b/index.html
+index 8efe021..3fda3f8 100644
+--- a/index.html
++++ b/index.html
+@@ -32,7 +32,8 @@
+ <button class="ib" id="rs" title="Reset view (R)" aria-label="Reset view"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button><button class="ib" id="fz" title="Zoom to selection (Z)" aria-label="Zoom to selection"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4M11 8v6M8 11h6"/></svg></button><button class="ib" id="hb" title="Show hydrogens (H)" aria-label="Show hydrogens" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M15 5v14M5 12h10"/><circle cx="20" cy="17" r="1.6"/></svg></button><button class="ib" id="d2" title="See in 2D (D)" aria-label="See in 2D"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16M12 4v16" stroke-dasharray="2 2"/></svg></button><button class="ib" id="ar" title="Rotate (Space)" aria-label="Rotate" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button><label class="kv" style="display:none;align-items:center;gap:4px" id="spl"><span>Speed</span><input type="range" id="sp" min="0.5" max="6" step=".5" value="1" aria-label="Rotation speed" style="width:70px"></label><button class="ib" id="pm" title="Present (P)" aria-label="Present"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg></button></div>
+ <div id="elb" aria-hidden="true"></div><div id="lbl" aria-hidden="true"></div><div id="ov" role="status" aria-live="polite"></div><div id="tip"></div><button class="ib" id="rshow" title="Open details panel" aria-label="Open details panel" aria-expanded="false" aria-controls="info"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button><div id="tch" class="kv" style="position:absolute;right:10px;bottom:10px;width:310px;max-height:70%;overflow:auto;background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:10px;display:none"></div><div id="pres" class="kv"><h2 id="pn"></h2><p id="pd"></p><button id="px">Exit presentation</button></div></div>
+ <aside class="r"><div class="rscroll"><div id="info"></div>
+-<details class="sec" open><summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Display Options</summary><div class="row mt"><label title="Show hydrogen atoms as spheres bonded to their parent atoms (same as the H button above the molecule and the H key). Hiding them only hides them: they stay in the structure."><input type="checkbox" id="hh"> Show hydrogens</label><label title="Write the element symbol (C, N, O, H…) on each atom sphere. Symbols appear when an atom is large enough on screen, so zooming in reveals more; nearer atoms hide the symbols of atoms behind them."><input type="checkbox" id="el" checked> Element labels</label><label><input type="checkbox" id="ww" checked> Solvent</label><label><input type="checkbox" id="bo" checked> Bond orders</label></div></details>
++<details class="sec" open><summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Display Options</summary><div class="row mt"><label title="Show hydrogen atoms as spheres bonded to their parent atoms (same as the H button above the molecule and the H key). Hiding them only hides them: they stay in the structure."><input type="checkbox" id="hh"> Show hydrogens</label>
++<label title="Show lone electron pairs as translucent purple lobes with two electron dots (they are not atoms). Shown in Ball and stick view for O, N, S and halogen atoms whose bonding is complete: water 2, ammonia 1, carbonyl O 2, amine N 1."><input type="checkbox" id="lp"> Show lone pairs</label><label title="Write the element symbol (C, N, O, H…) on each atom sphere. Symbols appear when an atom is large enough on screen, so zooming in reveals more; nearer atoms hide the symbols of atoms behind them."><input type="checkbox" id="el" checked> Element labels</label><label><input type="checkbox" id="ww" checked> Solvent</label><label><input type="checkbox" id="bo" checked> Bond orders</label></div></details>
+ <details class="sec" open><summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg>Analysis</summary><div class="row mt"><label title="Show atom names on the selected atoms"><input type="checkbox" id="lb"> Labels</label><label title="Hide everything except the selected atoms"><input type="checkbox" id="so"> Selected only</label></div>
+ <div class="row mt"><button id="sall">All</button><button id="sinv">Invert</button><select id="selby" aria-label="Select by" style="width:auto;max-width:105px"></select><button id="clr">Clear</button></div>
+ <div id="sel" class="kv mt">Click atoms to select; use All or Select by… for many.</div><div id="meas" class="kv"></div></details>
+@@ -57,11 +58,13 @@
+      Files only define things; work is started from main.js. See docs/ARCHITECTURE.md. -->
+ <script src="js/foundation/constants.js"></script>
+ <script src="js/generated/hydrogens.js"></script>
++<script src="js/generated/lonepairs.js"></script>
+ <script src="js/foundation/library.js"></script>
+ <script src="js/foundation/core.js"></script>
+ <script src="js/viewer/scene.js"></script>
+ <script src="js/viewer/display-options.js"></script>
+ <script src="js/viewer/molecule-render.js"></script>
++<script src="js/viewer/lone-pairs.js"></script>
+ <script src="js/viewer/labels.js"></script>
+ <script src="js/generated/layout2d.js"></script>
+ <script src="js/tools/view2d.js"></script>
+diff --git a/js/app/loading.js b/js/app/loading.js
+index 44923ab..fcaf95b 100644
+--- a/js/app/loading.js
++++ b/js/app/loading.js
+@@ -9,4 +9,4 @@ function bondInfo(){const c={},h={};mol.orders.forEach(o=>c[o]=(c[o]||0)+1);mol.
+ return`<b>Bond orders (${mol.osrc.filter(x=>x==='template').length} from standard-residue templates, ${mol.osrc.filter(x=>x==='length').length} inferred from bond length only):</b> ${Object.entries(c).map(([k,v])=>v+' '+N[k]).join(', ')||'none'}.<br><b>Hybridization (C, N, O):</b> ${Object.entries(h).map(([k,v])=>k+' ×'+v).join(', ')||'n/a'}.<br><b>Angle check</b> vs ideal (sp 180°, sp² 120°, sp³ 109.5°): ${g.checked?'largest deviation '+g.maxDeviation.toFixed(1)+'°'+(g.outliers.length?', '+g.outliers.length+' angle(s) beyond tolerance':', all within tolerance'):'n/a'}.<br>Bond orders and hybridization are <i>inferred from bond lengths and neighbours</i> (PDB/mmCIF coordinates do not store them): dependable for the small molecules here, approximate for imported structures (e.g. aromatic nitrogen rings are drawn single). Untick “Bond orders” to hide them.`}
+ function info(){const e=mol.entry,A=mol.atoms,ch=new Set(A.map(a=>a.chain)).size,res=new Set(A.map(a=>a.chain+a.resi+a.res)).size,els={};A.forEach(a=>els[a.el]=(els[a.el]||0)+1);
+ $('#info').innerHTML=`<b>${esc(e.name)}</b><div class="kv">${esc(e.abbr||'')} · ${esc(e.cat)}</div><p>${esc(e.desc)}</p><div class="kv"><b>Function:</b> ${esc(e.fn||'Not provided for imported files.')}<br><b>Source:</b> ${esc(e.src)}<br><b>Format:</b> ${esc(e.fmt)}</div>
+-<details class="sec"><summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Scientific details</summary><div class="kv">Atoms: <b>${A.length}</b> (hydrogens: <b>${els.H||0}</b>${els.H?'':' — this structure has none'+(e.noH?': '+esc(e.noH):'')}) · Bonds (distance-derived): <b>${mol.bonds.length}</b><br>Chains: <b>${ch}</b>${mol.ext!=='xyz'?` · Residues: <b>${res}</b>`:''}<br>Composition: ${Object.entries(els).map(([k,v])=>esc(k)+v).join(' ')}<br>${e.sci||''}<br>Bond connectivity is inferred from covalent radii.<br>${bondInfo()}<br> Molecular weight, resolution and method are shown only when provided by a source, so they are omitted here.</div></details>`}
++<details class="sec"><summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Scientific details</summary><div class="kv">Atoms: <b>${A.length}</b> (hydrogens: <b>${els.H||0}</b>${els.H?'':' — this structure has none'+(e.noH?': '+esc(e.noH):'')}) · Bonds (distance-derived): <b>${mol.bonds.length}</b> · Lone pairs (not atoms): <b>${lonePairData().length}</b><br>Chains: <b>${ch}</b>${mol.ext!=='xyz'?` · Residues: <b>${res}</b>`:''}<br>Composition: ${Object.entries(els).map(([k,v])=>esc(k)+v).join(' ')}<br>${e.sci||''}<br>Bond connectivity is inferred from covalent radii.<br>${bondInfo()}<br> Molecular weight, resolution and method are shown only when provided by a source, so they are omitted here.</div></details>`}
+diff --git a/js/app/session.js b/js/app/session.js
+index 9a6ee4c..66598b5 100644
+--- a/js/app/session.js
++++ b/js/app/session.js
+@@ -1,13 +1,13 @@
+ // js/app/session.js: Saving and restoring a session (structure, selection, camera, display settings).
+ function saveSession(){if(!need())return;const e=mol.entry,inc=mol.raw&&mol.raw.length<5e6;save('laura_session_'+slug()+'.json',JSON.stringify({laura:'0.3',savedAt:new Date().toISOString(),
+-structure:{id:e.id,name:e.name,builtin:LIB.includes(e),src:e.src,fmt:e.fmt,ext:mol.ext||null,raw:inc?mol.raw:null,rawOmitted:!!mol.raw&&!inc},settings:{style:$('#sty').value,hydrogens:$('#hh').checked,solvent:$('#ww').checked,labels:$('#lb').checked,elements:$('#el').checked},
++structure:{id:e.id,name:e.name,builtin:LIB.includes(e),src:e.src,fmt:e.fmt,ext:mol.ext||null,raw:inc?mol.raw:null,rawOmitted:!!mol.raw&&!inc},settings:{style:$('#sty').value,hydrogens:$('#hh').checked,solvent:$('#ww').checked,labels:$('#lb').checked,elements:$('#el').checked,lonepairs:$('#lp').checked},
+ selection:sel.map(i=>{const a=mol.atoms[i];return[a.chain,a.serial,a.name]}),contacts:{ligand:$('#lig').value,cutoff:$('#cut').value,annotated:$('#ann').value,source:$('#asrc').value,result:lastC},camera:{p:cam.position.toArray(),t:ctl?ctl.target.toArray():[0,0,0]},
+ note:'Structure is restored from the packaged file or built-in id; LAURA refuses to restore against a different structure.'},null,1))}
+ async function loadSession(f){try{if(f.size>Core.SESSION_MAX_CHARS)throw Error(`Not a valid LAURA session: the file is ${(f.size/1e6).toFixed(1)} MB; the limit is ${(Core.SESSION_MAX_CHARS/1e6).toFixed(1)} MB.`);const V=Core.validateSession(await f.text());if(!V.ok)throw Error(V.error);const S=V.session,st=S.structure;let e;
+ if(st.builtin){e=LIB.find(l=>l.id===st.id);if(!e)throw Error('Built-in molecule "'+st.id+'" is not in this version of LAURA.')}
+ else if(st.raw){const r=parseFile(st.name.replace(/\.\w+$/,'')+'.'+st.ext,st.raw);e={id:st.id,file:st.name.replace(/\.\w+$/,'')+'.'+st.ext,name:st.name,abbr:(st.ext||'').toUpperCase(),cat:'Imported and user-added structures',desc:'Restored from a session file.',src:st.src,fmt:st.fmt,get:()=>r};imported.push(e);cats()}
+ else throw Error('This session did not package its structure ('+(st.rawOmitted?'file too large':'not stored')+'). Re-import the original file; nothing was restored.');
+-const g=S.settings;$('#sty').dataset.u=1;$('#sty').value=g.style==='tb'||g.style==='bb'?'tb':'bs';$('#hh').checked=g.hydrogens;$('#ww').checked=g.solvent;$('#lb').checked=g.labels;$('#el').checked=g.elements;await load(e);
++const g=S.settings;$('#sty').dataset.u=1;$('#sty').value=g.style==='tb'||g.style==='bb'?'tb':'bs';$('#hh').checked=g.hydrogens;$('#ww').checked=g.solvent;$('#lb').checked=g.labels;$('#el').checked=g.elements;$('#lp').checked=g.lonepairs;await load(e);
+ sel=S.selection.map(x=>mol.atoms.findIndex(a=>a.serial===x[1]&&a.name===x[2]&&a.chain===x[0])).filter(i=>i>=0);const c=S.contacts;$('#cut').value=c.cutoff;$('#ann').value=c.annotated;$('#asrc').value=c.source;if(c.result&&[...$('#lig').options].some(o=>o.value===c.ligand)){$('#lig').value=c.ligand;runContacts()}
+ if(S.camera){cam.position.fromArray(S.camera.p);if(ctl){ctl.target.fromArray(S.camera.t);ctl.update()}}drawSel();toast('Session restored.')}catch(x){toast('Session not restored: '+x.message,8000)}}
+ $('#ss').onclick=saveSession;$('#slb').onclick=()=>$('#sl').click();$('#sl').onchange=e=>{e.target.files[0]&&loadSession(e.target.files[0]);e.target.value=''};
+diff --git a/js/foundation/core.js b/js/foundation/core.js
+index 3faff25..7351d39 100644
+--- a/js/foundation/core.js
++++ b/js/foundation/core.js
+@@ -248,8 +248,8 @@ function validateSession(text,{maxChars=SESSION_MAX_CHARS}={}){if(typeof text!==
+  const st=S.structure;if(!st||typeof st!=='object')return bad('the "structure" section is missing.');
+  if(typeof st.id!=='string'||typeof st.name!=='string')return bad('structure.id and structure.name must be text.');
+  if(st.builtin!==true&&typeof st.raw!=='string')return bad(st.rawOmitted?'the structure file was too large to package; re-import the original file.':'the structure file is not packaged and it is not a built-in molecule.');
+- const set={style:'bs',hydrogens:false,solvent:true,labels:false,elements:true,...(S.settings||{})};if(!STYLES.includes(set.style))return bad(`unknown display style "${String(set.style).slice(0,20)}".`);
+- for(const k of['hydrogens','solvent','labels','elements'])if(typeof set[k]!=='boolean')return bad(`settings.${k} must be true or false.`);
++ const set={style:'bs',hydrogens:false,solvent:true,labels:false,elements:true,lonepairs:false,...(S.settings||{})};if(!STYLES.includes(set.style))return bad(`unknown display style "${String(set.style).slice(0,20)}".`);
++ for(const k of['hydrogens','solvent','labels','elements','lonepairs'])if(typeof set[k]!=='boolean')return bad(`settings.${k} must be true or false.`);
+  const sel=S.selection===undefined?[]:S.selection;if(!Array.isArray(sel)||!sel.every(x=>Array.isArray(x)&&x.length===3&&typeof x[0]==='string'&&fin(x[1])&&typeof x[2]==='string'))return bad('selection entries must be [chain, serial, atom name].');
+  const con={ligand:'',cutoff:'4.0',annotated:'',source:'',result:null,...(S.contacts||{})};for(const k of['ligand','cutoff','annotated','source'])if(typeof con[k]!=='string')return bad(`contacts.${k} must be text.`);
+  if(S.camera!==undefined&&S.camera!==null&&!(S.camera&&vec3(S.camera.p)&&vec3(S.camera.t)))return bad('camera.p and camera.t must be three finite numbers.');
+diff --git a/js/generated/layout2d.js b/js/generated/layout2d.js
+index 642f3a3..29056c2 100644
+--- a/js/generated/layout2d.js
++++ b/js/generated/layout2d.js
+@@ -87,12 +87,14 @@ const subscript=n=>String(n).split('').map(c=>SUBS[+c]).join('');
+ function atomLabelParts(el,nH=0,charge=0,hLeft=false){const h=nH?'H'+(nH>1?subscript(nH):''):'',mag=Math.abs(charge),ch=charge?(mag>1?String(mag).split('').map(c=>SUPS[+c]).join(''):'')+(charge>0?'⁺':'⁻'):'';
+  return hLeft?{pre:h,sym:el,post:ch}:{pre:'',sym:el,post:h+ch}}
+ // Bond orders and charges as they should be DRAWN. A delocalised carboxylate (two terminal O on one C, both order 1.5) is shown the usual way:
+-// one C=O and one C-O-; 4-coordinate N is N+. Nothing else is guessed (a bare single-bonded O may just be an OH whose H is missing from the file).
++// one C=O and one C-O-; a delocalised group with an O-H (protonated acid) is shown as C=O and C-OH; 4-coordinate N is N+. Nothing else is guessed (a bare single-bonded O may just be an OH whose H is missing from the file).
+ // Returns {orders, charge: Map(atom -> charge)}.
+ function drawnOrdersAndCharges(atoms,bonds,orders){
+  const el=i=>atoms[i].el||atoms[i].element,adj=atoms.map(()=>[]),out=[...orders],charge=new Map();
+  bonds.forEach(([a,b],k)=>{adj[a].push([b,k]);adj[b].push([a,k])});
+- atoms.forEach((_,c)=>{if(el(c)!=='C')return;const t=adj[c].filter(([o,k])=>el(o)==='O'&&adj[o].length===1&&orders[k]===1.5);
++ atoms.forEach((_,c)=>{if(el(c)!=='C')return;const t=adj[c].filter(([o,k])=>el(o)==='O'&&adj[o].length===1&&orders[k]===1.5),
++  h=adj[c].filter(([o,k])=>el(o)==='O'&&adj[o].length===2&&adj[o].some(([x])=>el(x)==='H')&&orders[k]===1.5);   // O-H carrying a delocalised bond
++  if(t.length>=1&&h.length>=1){out[t[0][1]]=2;out[h[0][1]]=1;return}       // protonated carboxylic acid (a C-terminus with its OXT-H): C=O and C-OH
+   if(t.length>=2){out[t[0][1]]=2;out[t[1][1]]=1;charge.set(t[1][0],-1)}});
+  atoms.forEach((_,i)=>{if(el(i)==='N'&&adj[i].length===4)charge.set(i,1)});
+  return{orders:out,charge}}
+diff --git a/js/generated/lonepairs.js b/js/generated/lonepairs.js
+new file mode 100644
+index 0000000..c3e3bf2
+--- /dev/null
++++ b/js/generated/lonepairs.js
+@@ -0,0 +1,71 @@
++// GENERATED FILE - do not edit. Source: src/core/lonepairs.mjs
++// Rebuild with: node tools/build_viewer.mjs
++const LonePairs=(()=>{
++// Lone electron pairs: how many each atom has (from valence) and in which directions to draw them (from the real geometry around the atom).
++// Pure functions, no DOM. A lone pair is NOT an atom: this module only returns counts and unit directions, never atoms.
++//
++// Count:  lone pairs = floor((valence electrons - formal charge - sum of bond orders) / 2), for N, O, S, P, Se and the halogens.
++//         It is only counted when the atom's bonding is COMPLETE (bond-order sum >= that of the neutral atom: N 3, O 2, S 2, halogen 1, ...).
++//         An atom that looks short of bonds (usually because hydrogens are missing from the file) gets none: a missing N-H must not look like a lone pair.
++//         Delocalised (1.5) bonds count 1.5, so an aromatic pyrrole-type N-H or furan O (lone pair in the pi system) correctly gets none.
++// Place:  the directions complete the geometry that is really there around the atom, so they follow the electron-region geometry:
++//         tetrahedral (sp3: water, ammonia, amines, alcohols, ethers), trigonal in the molecular plane (sp2: C=O oxygen, pyridine N),
++//         perpendicular to the plane for a lone pair conjugated with a pi system (aniline / amide N, phenol O: the "p" lone pair), linear (sp: N2, HCN, CO).
++const R=Math.PI/180;
++const VALENCE_E={N:5,O:6,S:6,P:5,Se:6,F:7,Cl:7,Br:7,I:7};      // valence electrons
++const NORMAL_SUM={N:3,O:2,S:2,P:3,Se:2,F:1,Cl:1,Br:1,I:1};     // bond-order sum of the neutral atom
++const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
++const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],len=a=>Math.hypot(a[0],a[1],a[2]);
++const unit=a=>{const l=len(a);return l>1e-12?mul(a,1/l):[0,0,0]};
++function perp(u,hint){let q=hint?sub(hint,mul(u,dot(hint,u))):null;if(!q||len(q)<1e-6){const ax=Math.abs(u[0])<.9?[1,0,0]:[0,1,0];q=sub(ax,mul(u,dot(ax,u)))}return unit(q)}
++const TETRA=[[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]].map(unit);
++
++// Lone pairs of one atom from its element, bond-order sum and formal charge. 0 for other elements and for atoms whose bonding looks incomplete.
++function lonePairCount(el,orderSum,charge=0){
++ const v=VALENCE_E[el];if(v===undefined)return 0;
++ if(orderSum<NORMAL_SUM[el]+charge-1e-9)return 0;
++ return Math.max(0,Math.floor((v-charge-orderSum)/2+1e-9))}
++
++// atoms: [{el|element,x,y,z}]; bonds: [[i,j]]; orders: bond order per bond (1, 2, 3, 1.5 delocalised).
++// opts.charges: Map(atomIndex -> formal charge) for the charges that can be read off the structure (N+ in NH3+, carboxylate O-).
++// opts.hasH: does the structure contain hydrogens at all (default: look). Without hydrogens, delocalised atoms are skipped: a ring N could be pyridine-type or N-H.
++// Returns [{atom, dir:[x,y,z] unit vector from the atom, type:'sp3'|'sp2'|'p'|'sp'}], one entry per lone pair.
++function computeLonePairs(atoms,bonds,orders,opts={}){
++ const el=i=>atoms[i].el||atoms[i].element,P=i=>[atoms[i].x,atoms[i].y,atoms[i].z],charges=opts.charges||new Map(),hasH=opts.hasH!==undefined?opts.hasH:atoms.some((_,i)=>el(i)==='H');
++ const nb=atoms.map(()=>[]);bonds.forEach(([i,j],k)=>{const o=orders[k]||1;nb[i].push([j,o]);nb[j].push([i,o])});
++ const sum=i=>nb[i].reduce((s,[,o])=>s+o,0),unsat=i=>nb[i].some(([,o])=>o>1);   // unsaturated: a double, triple or delocalised bond
++ const out=[];
++ for(let i=0;i<atoms.length;i++){
++  const e=el(i),d=nb[i].length;let m;
++  if(e==='C')m=d===1&&nb[i][0][1]===3&&(el(nb[i][0][0])==='O'||el(nb[i][0][0])==='N')?1:0;   // carbon monoxide / isocyanide carbon (formally C-)
++  else m=lonePairCount(e,sum(i),charges.get(i)||0);
++  if(!m)continue;
++  if(!hasH&&nb[i].some(([,o])=>o%1!==0))continue;
++  const p=P(i),u=nb[i].map(([j])=>unit(sub(P(j),p)));let dirs=[];   // dirs: [direction, type]
++  const conj=(e==='N'||e==='O'||e==='S')&&nb[i].some(([j])=>nb[j].some(([k,o])=>k!==i&&o>1));   // lone pair next to a pi system
++  const planar=unsat(i)||conj;
++  if(d===0)dirs=TETRA.slice(0,m).map(t=>[t,'sp3']);
++  else if(d===1){
++   const a=u[0],j=nb[i][0][0],o=nb[i][0][1];
++   if(o===3)dirs=[[mul(a,-1),'sp']];                                   // N2, HCN, CO
++   else{
++    const rs=nb[j].filter(([k])=>k!==i),ref=rs.find(([,q])=>q>1)||rs[0],e1=ref?perp(a,sub(P(ref[0]),P(j))):perp(a),e2=cross(a,e1);
++    const at=(deg,ph)=>add(mul(a,Math.cos(deg*R)),mul(add(mul(e1,Math.cos(ph*R)),mul(e2,Math.sin(ph*R))),Math.sin(deg*R)));
++    if(planar){dirs=[[at(120,0),'sp2'],[at(120,180),'sp2']].slice(0,m);if(m>=3)dirs.push([e2,'p'])}   // carbonyl O: two in the plane; carboxylate O-: two in the plane + one p
++    else dirs=[180,60,-60].slice(0,m).map(ph=>[at(109.5,ph),'sp3']);   // halide, alkoxide-like: three staggered
++   }}
++  else if(d===2){
++   const[a,b]=u,s=add(a,b),bis=len(s)<1e-6?perp(a):mul(unit(s),-1),nrm=len(cross(a,b))<1e-6?perp(bis):unit(cross(a,b)),al=54.75*R;
++   const tet=[add(mul(bis,Math.cos(al)),mul(nrm,Math.sin(al))),add(mul(bis,Math.cos(al)),mul(nrm,-Math.sin(al)))];
++   if(planar)dirs=m===1?[[bis,'sp2']]:[[bis,'sp2'],[nrm,'p']];             // pyridine N: in the plane; conjugated O (phenol, acid OH): one in the plane, one p
++   else dirs=tet.slice(0,m).map(t=>[t,'sp3']);                              // water, alcohols, ethers, thiols
++  }
++  else if(d===3&&m===1){
++   const s=add(add(u[0],u[1]),u[2]);
++   dirs=len(s)<.3?[[len(cross(u[0],u[1]))<1e-6?perp(u[0]):unit(cross(u[0],u[1])),'p']]:[[mul(unit(s),-1),'sp3']];   // pyramidal (NH3, amines) or planar-conjugated (aniline, amide)
++  }
++  for(const[dir,type]of dirs)out.push({atom:i,dir,type});
++ }
++ return out}
++
++return{lonePairCount,computeLonePairs}})();
+diff --git a/js/main.js b/js/main.js
+index 550283c..4c32811 100644
+--- a/js/main.js
++++ b/js/main.js
+@@ -5,7 +5,7 @@
+ renderLoop();restoreSavedImports();
+ function theme(t){document.documentElement.dataset.theme=t;thBtn();try{localStorage.setItem('laura-theme',t)}catch(e){}requestAnimationFrame(()=>{setBg();build()})}
+ $('#th').onclick=()=>theme((document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'))==='dark'?'light':'dark');
+-$('#q').oninput=renderList;$('#mol').onchange=e=>{const m=[...LIB,...imported].find(x=>x.id===e.target.value);if(m)load(m)};$('#srt').onchange=()=>{try{localStorage.setItem('laura-sort',$('#srt').value)}catch(e){}renderList();molSel()};$('#cat').onchange=renderList;$('#stb').onclick=()=>{const s=$('#sty');s.dataset.u=1;s.value=s.value==='tb'?'bs':'tb';build()};$('#ww').onchange=$('#bo').onchange=build;$('#el').onchange=()=>{lbDirty=true};$('#hh').onchange=()=>setH($('#hh').checked);$('#hb').onclick=()=>setH(!$('#hh').checked);
++$('#q').oninput=renderList;$('#mol').onchange=e=>{const m=[...LIB,...imported].find(x=>x.id===e.target.value);if(m)load(m)};$('#srt').onchange=()=>{try{localStorage.setItem('laura-sort',$('#srt').value)}catch(e){}renderList();molSel()};$('#cat').onchange=renderList;$('#stb').onclick=()=>{const s=$('#sty');s.dataset.u=1;s.value=s.value==='tb'?'bs':'tb';build()};$('#ww').onchange=$('#bo').onchange=build;$('#el').onchange=()=>{lbDirty=true};$('#lp').onchange=()=>{build();lonePairNotice()};$('#hh').onchange=()=>setH($('#hh').checked);$('#hb').onclick=()=>setH(!$('#hh').checked);
+ $('#rs').onclick=fit;$('#fz').onclick=focusSel;$('#ar').onclick=()=>{if(ctl){ctl.autoRotate=!ctl.autoRotate;if(ctl.autoRotate){ctl.autoRotateSpeed=1;$('#sp').value=1}$('#spl').style.display=ctl.autoRotate?'flex':'none';$('#ar').classList.toggle('on',ctl.autoRotate);$('#ar').setAttribute('aria-pressed',ctl.autoRotate)}};$('#sp').oninput=e=>{if(ctl)ctl.autoRotateSpeed=+e.target.value};
+ function popSelBy(){const A=mol.atoms,u=k=>[...new Set(A.map(a=>a[k]).filter(v=>v!==''&&v!=null))].sort(),g=(l,k)=>{const v=u(k);return v.length?`<optgroup label="${l}">`+v.map(x=>`<option value="${l[0]}:${esc(x)}">${esc(x)}</option>`).join('')+'</optgroup>':''};
+ $('#selby').innerHTML='<option value="">Select by…</option>'+g('Element','el')+g('Chain','chain')+g('Residue','res')}
+diff --git a/js/tools/help.js b/js/tools/help.js
+index 8606045..bba3bc4 100644
+--- a/js/tools/help.js
++++ b/js/tools/help.js
+@@ -7,6 +7,7 @@ const HELP=`<div class="help-content"><b class="help-main-title">LAURA feature g
+ <p><b class="help-subtitle">Selection and measurements</b><br>Select atoms individually or in groups. Measure distances, angles and dihedrals, or view a summary of the selection.</p>
+ <p><b class="help-subtitle">Zoom to selection (Z) and See in 2D (D)</b><br>Center the view on selected atoms or create a 2D structure diagram (or a flat projection of the 3D coordinates) that can be enlarged or saved as a PNG.</p>
+ <p><b class="help-subtitle">Hydrogens (H)</b><br>Hydrogens are hidden by default. Tick <b>Show hydrogens</b> in <b>Display Options</b>, click the H button above the molecule, or press H to show them as small white spheres bonded to their parent atoms (in 2D too, where they are drawn as bonded H atoms; hidden, 2D writes them on the atom instead: OH, NH₂, SH, NH₃⁺). Hiding only hides: the hydrogens stay in the structure, in the atom counts, formulas and exports. The schematic DNA has no hydrogens, and imported files only have the hydrogens they were saved with.</p>
++<p><b class="help-subtitle">Lone pairs</b><br><b>Show lone pairs</b> (Display Options) draws lone electron pairs as translucent purple lobes with two electron dots, in Ball and stick view. They are <b>not atoms</b>: they are not counted, selected or measured. The number on each atom comes from its valence (water O 2, ammonia N 1, carbonyl O 2, amine N 1, halide 3) and the lobes point where the electron regions are: tetrahedral for sp3 atoms, in the molecular plane for a carbonyl O or pyridine N, and perpendicular to the plane for a lone pair conjugated with a pi system (aniline or amide N, phenol O). Atoms that look short of bonds (usually because hydrogens are missing from the file) are skipped rather than guessed, and a lone pair that belongs to an aromatic ring (pyrrole-type N-H) is not shown.</p>
+ <p><b class="help-subtitle">Element labels</b><br><b>Element labels</b> (Display Options, on by default) writes the element symbol (C, N, O, H…) on each atom sphere so you never have to click an atom to see what it is. A symbol appears once its sphere is big enough on screen to hold it, so zooming in reveals more; an atom hidden behind a nearer one gets no symbol, symbols never overlap, and at most 250 are drawn. They are not shown in Chains view, which has no atom spheres. The separate <b>Labels</b> option in Analysis still shows atom names on the selected atoms.</p>
+ <p><b class="help-subtitle">Bond orders and hybridization</b><br>Bond orders and C/N/O hybridization are estimated from geometry and may be approximate for imported structures.</p>
+ <p><b class="help-subtitle">Ramachandran</b><br>Plots protein backbone φ/ψ angles by chain; shaded regions are schematic, not validation contours.</p>
+diff --git a/js/viewer/lone-pairs.js b/js/viewer/lone-pairs.js
+new file mode 100644
+index 0000000..1730be3
+--- /dev/null
++++ b/js/viewer/lone-pairs.js
+@@ -0,0 +1,28 @@
++// js/viewer/lone-pairs.js: Lone electron pairs drawn as translucent purple lobes with two electron dots (not atoms: not in mol.atoms, not pickable, not counted).
++// Counts and directions come from LonePairs (js/generated/lonepairs.js); drawLonePairs() is called from build() (Ball and stick view) when "Show lone pairs" is on.
++const LP_COLOR=0xb388ff,LP_MAX_ATOMS=6000;let lpShown=0;   // lpShown: lone pairs drawn by the last build (-1: structure too large)
++// Computed once per molecule, from the same bond orders and charges the 2D diagram uses (carboxylate, protonated acid, N+).
++function lonePairData(){
++ if(mol._lp)return mol._lp;
++ if(mol.entry&&mol.entry.noH){mol._lp=[];return mol._lp}   // schematic models (B-DNA) have no real atoms
++ const dr=Layout2D.drawnOrdersAndCharges(mol.atoms,mol.bonds,mol.orders);
++ mol._lp=LonePairs.computeLonePairs(mol.atoms,mol.bonds,dr.orders,{charges:dr.charge});return mol._lp}
++// inS: Set of the atom indices drawn; R(a): the sphere radius of an atom. The lobe starts at the sphere surface and points along the lone-pair direction.
++function drawLonePairs(inS,R){lpShown=0;if(!$('#lp').checked||!mol)return;
++ if(inS.size>LP_MAX_ATOMS){lpShown=-1;return}
++ const A=mol.atoms,items=lonePairData().filter(l=>inS.has(l.atom));lpShown=items.length;if(!items.length)return;
++ const lobes=new THREE.InstancedMesh(new THREE.SphereGeometry(1,18,12),new THREE.MeshStandardMaterial({color:LP_COLOR,transparent:true,opacity:.5,roughness:.35,depthWrite:false}),items.length),
++  dots=new THREE.InstancedMesh(new THREE.SphereGeometry(1,8,6),new THREE.MeshBasicMaterial({color:0xffffff}),items.length*2),o=new THREE.Object3D(),zUp=new THREE.Vector3(0,0,1);let n=0;
++ items.forEach((l,k)=>{const a=A[l.atom],d=l.dir,L=R(a)+.3,cx=a.x-cen.x+d[0]*L,cy=a.y-cen.y+d[1]*L,cz=a.z-cen.z+d[2]*L;
++  o.quaternion.setFromUnitVectors(zUp,new THREE.Vector3(d[0],d[1],d[2]));o.position.set(cx,cy,cz);o.scale.set(.21,.21,.34);o.updateMatrix();lobes.setMatrixAt(k,o.matrix);
++  let s=Math.abs(d[1])<.9?[-d[2],0,d[0]]:[0,d[2],-d[1]];const sl=Math.hypot(...s)||1;s=[s[0]/sl,s[1]/sl,s[2]/sl];   // across the lobe: the two electrons of the pair side by side
++  for(const q of[-1,1]){o.quaternion.identity();o.position.set(cx+q*s[0]*.085,cy+q*s[1]*.085,cz+q*s[2]*.085);o.scale.setScalar(.065);o.updateMatrix();dots.setMatrixAt(n++,o.matrix)}});
++ lobes.userData.lp=items.length;dots.userData.lpDots=items.length*2;grp.add(lobes);grp.add(dots)}
++// Feedback when the user turns the option on and nothing can be shown.
++function lonePairNotice(){if(!$('#lp').checked||!mol)return;
++ if(mol.entry&&mol.entry.noH)return toast(mol.entry.noH,7000);
++ if(ro&&ro.st!=='bs')return toast('Lone pairs are drawn in Ball and stick view; Chains view has no atoms to attach them to.',7000);
++ if(lpShown===-1)return toast('Lone pairs are drawn for structures up to '+LP_MAX_ATOMS+' atoms.',7000);
++ if(lpShown>0)return;
++ if(!lonePairData().length)return toast(mol.atoms.some(a=>a.el==='H')?'This structure has no lone pairs.':'No lone pairs shown: this structure has no hydrogens, so N and O atoms that look short of bonds (N-H, O-H) are skipped rather than guessed.',8000);
++ toast('None of the atoms shown has a lone pair.',6000)}
+diff --git a/js/viewer/molecule-render.js b/js/viewer/molecule-render.js
+index d716830..60ac5ab 100644
+--- a/js/viewer/molecule-render.js
++++ b/js/viewer/molecule-render.js
+@@ -15,6 +15,7 @@ for(const[i,j,ob]of B){const sh=SH[ob]||SH[1],u=sh.length>1?offDir(i,j):[0,0,0];
+ if(seg.length){const cm=new THREE.InstancedMesh(new THREE.CylinderGeometry(1,1,1,10),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.45}),seg.length*2),up=new THREE.Vector3(0,1,0);let n=0;
+ for(const[i,j,f,rs]of seg){const a=A[i],b=A[j],p=new THREE.Vector3(a.x+f[0],a.y+f[1],a.z+f[2]).sub(cen),q=new THREE.Vector3(b.x+f[0],b.y+f[1],b.z+f[2]).sub(cen),d=q.clone().sub(p),L=d.length(),mid=p.clone().add(q).multiplyScalar(.5);o.quaternion.setFromUnitVectors(up,d.normalize());o.scale.set((br||.1)*rs,L/2,(br||.1)*rs);
+ o.position.copy(p.clone().add(mid).multiplyScalar(.5));o.updateMatrix();cm.setMatrixAt(n,o.matrix);cm.setColorAt(n++,c.setHex(cpk(a.el)));o.position.copy(mid.clone().add(q).multiplyScalar(.5));o.updateMatrix();cm.setMatrixAt(n,o.matrix);cm.setColorAt(n++,c.setHex(cpk(b.el)))}grp.add(cm)}}
++if(st==='bs')drawLonePairs(inS,R);else lpShown=0;
+ drawSel()}
+ function offDir(i,j){return offDirG(mol.atoms,mol.adj,i,j)}
+ function offDirG(A,adj,i,j){const a=A[i],b=A[j],d=[b.x-a.x,b.y-a.y,b.z-a.z],L=Math.hypot(...d);d[0]/=L;d[1]/=L;d[2]/=L;
+diff --git a/src/core/layout2d.mjs b/src/core/layout2d.mjs
+index e1633e6..a0fdcfb 100644
+--- a/src/core/layout2d.mjs
++++ b/src/core/layout2d.mjs
+@@ -84,12 +84,14 @@ const subscript=n=>String(n).split('').map(c=>SUBS[+c]).join('');
+ export function atomLabelParts(el,nH=0,charge=0,hLeft=false){const h=nH?'H'+(nH>1?subscript(nH):''):'',mag=Math.abs(charge),ch=charge?(mag>1?String(mag).split('').map(c=>SUPS[+c]).join(''):'')+(charge>0?'⁺':'⁻'):'';
+  return hLeft?{pre:h,sym:el,post:ch}:{pre:'',sym:el,post:h+ch}}
+ // Bond orders and charges as they should be DRAWN. A delocalised carboxylate (two terminal O on one C, both order 1.5) is shown the usual way:
+-// one C=O and one C-O-; 4-coordinate N is N+. Nothing else is guessed (a bare single-bonded O may just be an OH whose H is missing from the file).
++// one C=O and one C-O-; a delocalised group with an O-H (protonated acid) is shown as C=O and C-OH; 4-coordinate N is N+. Nothing else is guessed (a bare single-bonded O may just be an OH whose H is missing from the file).
+ // Returns {orders, charge: Map(atom -> charge)}.
+ export function drawnOrdersAndCharges(atoms,bonds,orders){
+  const el=i=>atoms[i].el||atoms[i].element,adj=atoms.map(()=>[]),out=[...orders],charge=new Map();
+  bonds.forEach(([a,b],k)=>{adj[a].push([b,k]);adj[b].push([a,k])});
+- atoms.forEach((_,c)=>{if(el(c)!=='C')return;const t=adj[c].filter(([o,k])=>el(o)==='O'&&adj[o].length===1&&orders[k]===1.5);
++ atoms.forEach((_,c)=>{if(el(c)!=='C')return;const t=adj[c].filter(([o,k])=>el(o)==='O'&&adj[o].length===1&&orders[k]===1.5),
++  h=adj[c].filter(([o,k])=>el(o)==='O'&&adj[o].length===2&&adj[o].some(([x])=>el(x)==='H')&&orders[k]===1.5);   // O-H carrying a delocalised bond
++  if(t.length>=1&&h.length>=1){out[t[0][1]]=2;out[h[0][1]]=1;return}       // protonated carboxylic acid (a C-terminus with its OXT-H): C=O and C-OH
+   if(t.length>=2){out[t[0][1]]=2;out[t[1][1]]=1;charge.set(t[1][0],-1)}});
+  atoms.forEach((_,i)=>{if(el(i)==='N'&&adj[i].length===4)charge.set(i,1)});
+  return{orders:out,charge}}
+diff --git a/src/core/lonepairs.mjs b/src/core/lonepairs.mjs
+new file mode 100644
+index 0000000..240e2d6
+--- /dev/null
++++ b/src/core/lonepairs.mjs
+@@ -0,0 +1,66 @@
++// Lone electron pairs: how many each atom has (from valence) and in which directions to draw them (from the real geometry around the atom).
++// Pure functions, no DOM. A lone pair is NOT an atom: this module only returns counts and unit directions, never atoms.
++//
++// Count:  lone pairs = floor((valence electrons - formal charge - sum of bond orders) / 2), for N, O, S, P, Se and the halogens.
++//         It is only counted when the atom's bonding is COMPLETE (bond-order sum >= that of the neutral atom: N 3, O 2, S 2, halogen 1, ...).
++//         An atom that looks short of bonds (usually because hydrogens are missing from the file) gets none: a missing N-H must not look like a lone pair.
++//         Delocalised (1.5) bonds count 1.5, so an aromatic pyrrole-type N-H or furan O (lone pair in the pi system) correctly gets none.
++// Place:  the directions complete the geometry that is really there around the atom, so they follow the electron-region geometry:
++//         tetrahedral (sp3: water, ammonia, amines, alcohols, ethers), trigonal in the molecular plane (sp2: C=O oxygen, pyridine N),
++//         perpendicular to the plane for a lone pair conjugated with a pi system (aniline / amide N, phenol O: the "p" lone pair), linear (sp: N2, HCN, CO).
++const R=Math.PI/180;
++const VALENCE_E={N:5,O:6,S:6,P:5,Se:6,F:7,Cl:7,Br:7,I:7};      // valence electrons
++const NORMAL_SUM={N:3,O:2,S:2,P:3,Se:2,F:1,Cl:1,Br:1,I:1};     // bond-order sum of the neutral atom
++const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
++const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],len=a=>Math.hypot(a[0],a[1],a[2]);
++const unit=a=>{const l=len(a);return l>1e-12?mul(a,1/l):[0,0,0]};
++function perp(u,hint){let q=hint?sub(hint,mul(u,dot(hint,u))):null;if(!q||len(q)<1e-6){const ax=Math.abs(u[0])<.9?[1,0,0]:[0,1,0];q=sub(ax,mul(u,dot(ax,u)))}return unit(q)}
++const TETRA=[[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]].map(unit);
++
++// Lone pairs of one atom from its element, bond-order sum and formal charge. 0 for other elements and for atoms whose bonding looks incomplete.
++export function lonePairCount(el,orderSum,charge=0){
++ const v=VALENCE_E[el];if(v===undefined)return 0;
++ if(orderSum<NORMAL_SUM[el]+charge-1e-9)return 0;
++ return Math.max(0,Math.floor((v-charge-orderSum)/2+1e-9))}
++
++// atoms: [{el|element,x,y,z}]; bonds: [[i,j]]; orders: bond order per bond (1, 2, 3, 1.5 delocalised).
++// opts.charges: Map(atomIndex -> formal charge) for the charges that can be read off the structure (N+ in NH3+, carboxylate O-).
++// opts.hasH: does the structure contain hydrogens at all (default: look). Without hydrogens, delocalised atoms are skipped: a ring N could be pyridine-type or N-H.
++// Returns [{atom, dir:[x,y,z] unit vector from the atom, type:'sp3'|'sp2'|'p'|'sp'}], one entry per lone pair.
++export function computeLonePairs(atoms,bonds,orders,opts={}){
++ const el=i=>atoms[i].el||atoms[i].element,P=i=>[atoms[i].x,atoms[i].y,atoms[i].z],charges=opts.charges||new Map(),hasH=opts.hasH!==undefined?opts.hasH:atoms.some((_,i)=>el(i)==='H');
++ const nb=atoms.map(()=>[]);bonds.forEach(([i,j],k)=>{const o=orders[k]||1;nb[i].push([j,o]);nb[j].push([i,o])});
++ const sum=i=>nb[i].reduce((s,[,o])=>s+o,0),unsat=i=>nb[i].some(([,o])=>o>1);   // unsaturated: a double, triple or delocalised bond
++ const out=[];
++ for(let i=0;i<atoms.length;i++){
++  const e=el(i),d=nb[i].length;let m;
++  if(e==='C')m=d===1&&nb[i][0][1]===3&&(el(nb[i][0][0])==='O'||el(nb[i][0][0])==='N')?1:0;   // carbon monoxide / isocyanide carbon (formally C-)
++  else m=lonePairCount(e,sum(i),charges.get(i)||0);
++  if(!m)continue;
++  if(!hasH&&nb[i].some(([,o])=>o%1!==0))continue;
++  const p=P(i),u=nb[i].map(([j])=>unit(sub(P(j),p)));let dirs=[];   // dirs: [direction, type]
++  const conj=(e==='N'||e==='O'||e==='S')&&nb[i].some(([j])=>nb[j].some(([k,o])=>k!==i&&o>1));   // lone pair next to a pi system
++  const planar=unsat(i)||conj;
++  if(d===0)dirs=TETRA.slice(0,m).map(t=>[t,'sp3']);
++  else if(d===1){
++   const a=u[0],j=nb[i][0][0],o=nb[i][0][1];
++   if(o===3)dirs=[[mul(a,-1),'sp']];                                   // N2, HCN, CO
++   else{
++    const rs=nb[j].filter(([k])=>k!==i),ref=rs.find(([,q])=>q>1)||rs[0],e1=ref?perp(a,sub(P(ref[0]),P(j))):perp(a),e2=cross(a,e1);
++    const at=(deg,ph)=>add(mul(a,Math.cos(deg*R)),mul(add(mul(e1,Math.cos(ph*R)),mul(e2,Math.sin(ph*R))),Math.sin(deg*R)));
++    if(planar){dirs=[[at(120,0),'sp2'],[at(120,180),'sp2']].slice(0,m);if(m>=3)dirs.push([e2,'p'])}   // carbonyl O: two in the plane; carboxylate O-: two in the plane + one p
++    else dirs=[180,60,-60].slice(0,m).map(ph=>[at(109.5,ph),'sp3']);   // halide, alkoxide-like: three staggered
++   }}
++  else if(d===2){
++   const[a,b]=u,s=add(a,b),bis=len(s)<1e-6?perp(a):mul(unit(s),-1),nrm=len(cross(a,b))<1e-6?perp(bis):unit(cross(a,b)),al=54.75*R;
++   const tet=[add(mul(bis,Math.cos(al)),mul(nrm,Math.sin(al))),add(mul(bis,Math.cos(al)),mul(nrm,-Math.sin(al)))];
++   if(planar)dirs=m===1?[[bis,'sp2']]:[[bis,'sp2'],[nrm,'p']];             // pyridine N: in the plane; conjugated O (phenol, acid OH): one in the plane, one p
++   else dirs=tet.slice(0,m).map(t=>[t,'sp3']);                              // water, alcohols, ethers, thiols
++  }
++  else if(d===3&&m===1){
++   const s=add(add(u[0],u[1]),u[2]);
++   dirs=len(s)<.3?[[len(cross(u[0],u[1]))<1e-6?perp(u[0]):unit(cross(u[0],u[1])),'p']]:[[mul(unit(s),-1),'sp3']];   // pyramidal (NH3, amines) or planar-conjugated (aniline, amide)
++  }
++  for(const[dir,type]of dirs)out.push({atom:i,dir,type});
++ }
++ return out}
+diff --git a/src/core/session.mjs b/src/core/session.mjs
+index b61d9d1..f9b42b0 100644
+--- a/src/core/session.mjs
++++ b/src/core/session.mjs
+@@ -11,8 +11,8 @@ export function validateSession(text,{maxChars=SESSION_MAX_CHARS}={}){if(typeof
+  const st=S.structure;if(!st||typeof st!=='object')return bad('the "structure" section is missing.');
+  if(typeof st.id!=='string'||typeof st.name!=='string')return bad('structure.id and structure.name must be text.');
+  if(st.builtin!==true&&typeof st.raw!=='string')return bad(st.rawOmitted?'the structure file was too large to package; re-import the original file.':'the structure file is not packaged and it is not a built-in molecule.');
+- const set={style:'bs',hydrogens:false,solvent:true,labels:false,elements:true,...(S.settings||{})};if(!STYLES.includes(set.style))return bad(`unknown display style "${String(set.style).slice(0,20)}".`);
+- for(const k of['hydrogens','solvent','labels','elements'])if(typeof set[k]!=='boolean')return bad(`settings.${k} must be true or false.`);
++ const set={style:'bs',hydrogens:false,solvent:true,labels:false,elements:true,lonepairs:false,...(S.settings||{})};if(!STYLES.includes(set.style))return bad(`unknown display style "${String(set.style).slice(0,20)}".`);
++ for(const k of['hydrogens','solvent','labels','elements','lonepairs'])if(typeof set[k]!=='boolean')return bad(`settings.${k} must be true or false.`);
+  const sel=S.selection===undefined?[]:S.selection;if(!Array.isArray(sel)||!sel.every(x=>Array.isArray(x)&&x.length===3&&typeof x[0]==='string'&&fin(x[1])&&typeof x[2]==='string'))return bad('selection entries must be [chain, serial, atom name].');
+  const con={ligand:'',cutoff:'4.0',annotated:'',source:'',result:null,...(S.contacts||{})};for(const k of['ligand','cutoff','annotated','source'])if(typeof con[k]!=='string')return bad(`contacts.${k} must be text.`);
+  if(S.camera!==undefined&&S.camera!==null&&!(S.camera&&vec3(S.camera.p)&&vec3(S.camera.t)))return bad('camera.p and camera.t must be three finite numbers.');
+diff --git a/tests/browser/run_browser_tests.py b/tests/browser/run_browser_tests.py
+index c98a7cb..dcb91da 100644
+--- a/tests/browser/run_browser_tests.py
++++ b/tests/browser/run_browser_tests.py
+@@ -410,6 +410,41 @@ def _(pw):
+         ok(r['churn']<limit,'%s: %.1f%% of labels appear/vanish per frame at 1 degree/frame (limit %.1f; the old algorithm gave 6-10%%)'%(mid,r['churn'],limit));ok(r['fs']<.25,'%s: label sizes jump (mean change %.2f px/frame)'%(mid,r['fs']));ok(r['n']>20,'%s: too few labels (%d)'%(mid,r['n']))
+     ok(pg.evaluate("[...document.querySelectorAll('#elb .el')].every(n=>n.style.left===''&&n.style.top===''&&n.style.transform.startsWith('translate('))"),'labels must be positioned with transform only, not left/top (no layout work per frame)')
+     pg.uncheck('#el');pg.wait_for_timeout(150);ok(pg.evaluate("[...document.querySelectorAll('#elb .el')].every(n=>n.style.opacity==='0')"),'unticking fades every label out');pg.wait_for_timeout(700);ok(pg.evaluate("document.querySelectorAll('#elb .el').length")==0,'faded labels are removed from the page');pg._b.close()
++LPS="grp.children.filter(c=>c.userData&&c.userData.lp).reduce((n,c)=>n+c.userData.lp,0)"
++LPDOTS="grp.children.filter(c=>c.userData&&c.userData.lpDots).reduce((n,c)=>n+c.userData.lpDots,0)"
++@case('60 lone pairs: "Show lone pairs" in Display Options, off by default; water 2, ammonia 1, ethanol 2, formaldehyde 2, glycine 5; independent of hydrogens; never atoms')
++def _(pw):
++    pg=new_page(pw);n=lambda:pg.evaluate(LPS);atoms=lambda:pg.evaluate("lauraMirrorSource().atoms.length")
++    ok(pg.locator('#lp').count()==1 and not pg.is_checked('#lp'),'lone pairs should start hidden')
++    ok(pg.evaluate("document.querySelector('#lp').closest('details').querySelector('summary').textContent.trim()")=='Display Options' and 'Show lone pairs' in pg.inner_text('details.sec:has(#lp)'),'checkbox should be "Show lone pairs" in Display Options')
++    sel_mol(pg,'water','Water');ok(n()==0,'no lobes while hidden');a0=atoms();ab=pg.evaluate(ATOMMESH)
++    pg.check('#lp');pg.wait_for_timeout(150);ok(n()==2,'water should show 2 lone pairs, got %s'%n());ok(pg.evaluate(LPDOTS)==4,'two electron dots per pair')
++    ok(atoms()==a0==3 and pg.evaluate(ATOMMESH)==ab,'lone pairs must not be atoms: atoms %s -> %s, atom mesh %s -> %s'%(a0,atoms(),ab,pg.evaluate(ATOMMESH)))
++    ok(pg.evaluate("grp.children.filter(c=>c.userData&&c.userData.lp).every(c=>!c.userData.map)"),'lobes must not be in the pickable atom list')
++    ti=pg.evaluate("document.querySelector('#info').textContent");ok('Lone pairs (not atoms): 2' in ti,'details panel should state 2 lone pairs that are not atoms: '+ti[:200])
++    pg.check('#hh');pg.wait_for_timeout(100);ok(n()==2 and atoms()==3,'hydrogens on: still 2 lone pairs');pg.uncheck('#hh');pg.wait_for_timeout(100);ok(n()==2,'hydrogens off: still 2 (they belong to O, not to H)')
++    for mid,name,want in[('ammonia','Ammonia',1),('ethanol','Ethanol',2),('formaldehyde','Formaldehyde',2),('glycine','Glycine (neutral form)',5),('benzene','Benzene',0)]:
++        sel_mol(pg,mid,name);pg.wait_for_timeout(150);ok(n()==want,'%s: expected %d lone pairs, got %s'%(mid,want,n()))
++    pg.uncheck('#lp');pg.wait_for_timeout(100);ok(n()==0,'unticking removes them');pg._b.close()
++@case('61 lone pairs: honest feedback (no lone pairs / schematic model / Chains view), a peptide shows 38, large sizes and selected-only follow the atoms shown')
++def _(pw):
++    pg=new_page(pw);n=lambda:pg.evaluate(LPS);toast=lambda:pg.inner_text('#toast')
++    sel_mol(pg,'benzene','Benzene');pg.check('#lp');pg.wait_for_function("document.querySelector('#toast').textContent.includes('no lone pairs')",timeout=3000)
++    sel_mol(pg,'bdna');pg.wait_for_timeout(100);pg.uncheck('#lp');pg.check('#lp');pg.wait_for_function("document.querySelector('#toast').textContent.toLowerCase().includes('schematic')",timeout=3000);ok(n()==0,'schematic B-DNA has no real atoms')
++    sel_mol(pg,'pep_alpha');pg.wait_for_timeout(200);ok(n()==38,'Ala12: 12 amide N + 12 carbonyl O x 2 + acid group = 38, got %s'%n())
++    pg.check('#hh');pg.wait_for_timeout(100);ok(n()==38,'showing hydrogens does not change it')
++    pg.select_option('#selby','E:N');pg.check('#so');pg.wait_for_timeout(200);ok(n()==12,'selected only (the 12 N): 12 lone pairs, got %s'%n());pg.uncheck('#so')
++    sel_mol(pg,'pep_pair');pg.click('#stb');pg.uncheck('#lp');pg.check('#lp');pg.wait_for_function("document.querySelector('#toast').textContent.includes('Ball and stick')",timeout=3000);ok(n()==0,'Chains view has no atom spheres, so no lobes')
++    pg.click('#stb');pg.wait_for_timeout(200);ok(n()==76,'back in Ball and stick: 2 chains x 38, got %s'%n());pg._b.close()
++@case('62 lone pairs are part of the session (saved and restored); sessions saved before this option load with it off')
++def _(pw):
++    import json,tempfile
++    pg=new_page(pw);n=lambda:pg.evaluate(LPS);sel_mol(pg,'water','Water');pg.check('#lp');pg.wait_for_timeout(100)
++    with pg.expect_download() as d:pg.evaluate("saveSession()")
++    S=json.loads(open(d.value.path()).read());ok(S['settings'].get('lonepairs') is True,'saved settings: %s'%S['settings'])
++    pg.uncheck('#lp');pg.wait_for_timeout(100);ok(n()==0,'off');pg.set_input_files('#sl',d.value.path());pg.wait_for_timeout(600);ok(pg.is_checked('#lp') and n()==2,'restored: checkbox %s, lobes %s'%(pg.is_checked('#lp'),n()))
++    f=tempfile.NamedTemporaryFile('w',suffix='.json',delete=False);json.dump({'laura':'0.3','structure':{'id':'water','name':'Water','builtin':True}},f);f.close()
++    pg.set_input_files('#sl',f.name);pg.wait_for_timeout(600);ok(not pg.is_checked('#lp') and n()==0,'an old session loads with lone pairs off');pg._b.close()
+ @case('23 no console errors or failed requests across the whole run')
+ def _(pw):ok(not ERRORS,str(ERRORS)[:200])
+ 
+diff --git a/tests/generated.test.mjs b/tests/generated.test.mjs
+index f9f90d7..b70a7c5 100644
+--- a/tests/generated.test.mjs
++++ b/tests/generated.test.mjs
+@@ -1,9 +1,9 @@
+ import test from 'node:test';import assert from 'node:assert/strict';
+ import {generate} from '../tools/build_viewer.mjs';import {read} from './helpers/viewer-source.mjs';
+-// js/generated/* are built from src/ by tools/build_viewer.mjs. If you edit src/core/hydrogens.mjs, src/core/layout2d.mjs or anything in src/labs,
++// js/generated/* are built from src/ by tools/build_viewer.mjs. If you edit src/core/hydrogens.mjs, src/core/lonepairs.mjs, src/core/layout2d.mjs or anything in src/labs,
+ // run `node tools/build_viewer.mjs`; this test fails until you do (so a stale generated file can never be committed unnoticed).
+ const files=generate();
+-test('three files are generated: hydrogens, layout2d, labs',()=>{assert.deepEqual(Object.keys(files).sort(),['js/generated/hydrogens.js','js/generated/labs.js','js/generated/layout2d.js'])});
++test('four files are generated: hydrogens, lonepairs, layout2d, labs',()=>{assert.deepEqual(Object.keys(files).sort(),['js/generated/hydrogens.js','js/generated/labs.js','js/generated/layout2d.js','js/generated/lonepairs.js'])});
+ for(const[rel,text]of Object.entries(files))test(`${rel} is up to date with src/ (run: node tools/build_viewer.mjs)`,()=>{assert.equal(read(rel),text)});
+ test('generated files are marked as such and are classic scripts (no import/export), so index.html works from file://',()=>{
+  for(const[rel,text]of Object.entries(files)){assert.match(text,/^\/\/ GENERATED FILE - do not edit/);assert.ok(!/^(import|export) /m.test(text),rel)}});
+diff --git a/tests/helpers/library-env.mjs b/tests/helpers/library-env.mjs
+new file mode 100644
+index 0000000..4c1d2db
+--- /dev/null
++++ b/tests/helpers/library-env.mjs
+@@ -0,0 +1,5 @@
++// Evaluates the viewer's library + Core (js/foundation/*, js/generated/hydrogens.js) in Node, without a DOM, so tests can inspect the 43 built-in molecules.
++import {read} from './viewer-source.mjs';
++export const env=new Function([read('js/foundation/constants.js'),read('js/generated/hydrogens.js'),read('js/foundation/library.js'),read('js/foundation/core.js')].join('\n')+'\nreturn {LIB,Core,computeBonds,Hydrogens};')();
++// The atom records exactly as the viewer's load() builds them from a library entry (needed for residue-based bond perception).
++export const viewerAtoms=entry=>entry.get().atoms.map(a=>({hetero:false,iCode:'',element:a.el,resName:a.res,resSeq:a.resi,...a}));
+diff --git a/tests/hydrogens.test.mjs b/tests/hydrogens.test.mjs
+index c463ffd..acfa1be 100644
+--- a/tests/hydrogens.test.mjs
++++ b/tests/hydrogens.test.mjs
+@@ -51,6 +51,6 @@ test('drawn orders/charges: carboxylate shown as C=O plus C-O-, 4-coordinate N i
+ import {validateSession} from '../src/core/session.mjs';
+ test('session settings: hydrogens default to hidden and element labels to shown; old sessions stay readable; bad values are rejected',()=>{
+  const base={laura:'0.3',structure:{id:'water',name:'Water',builtin:true}},V=o=>validateSession(JSON.stringify(o));
+- let r=V(base);assert.equal(r.ok,true);assert.equal(r.session.settings.hydrogens,false);assert.equal(r.session.settings.elements,true);
++ let r=V(base);assert.equal(r.ok,true);assert.equal(r.session.settings.hydrogens,false);assert.equal(r.session.settings.elements,true);assert.equal(r.session.settings.lonepairs,false,'lone pairs default to hidden');
+  r=V({...base,settings:{hydrogens:true,elements:false}});assert.equal(r.session.settings.hydrogens,true);assert.equal(r.session.settings.elements,false);
+- r=V({...base,settings:{elements:'yes'}});assert.equal(r.ok,false);assert.match(r.error,/elements/)});
++ r=V({...base,settings:{elements:'yes'}});assert.equal(r.ok,false);assert.match(r.error,/elements/);r=V({...base,settings:{lonepairs:true}});assert.equal(r.session.settings.lonepairs,true);r=V({...base,settings:{lonepairs:1}});assert.equal(r.ok,false);assert.match(r.error,/lonepairs/)});
+diff --git a/tests/lonepairs.test.mjs b/tests/lonepairs.test.mjs
+new file mode 100644
+index 0000000..27ef8b5
+--- /dev/null
++++ b/tests/lonepairs.test.mjs
+@@ -0,0 +1,68 @@
++import test from 'node:test';import assert from 'node:assert/strict';
++import {lonePairCount,computeLonePairs} from '../src/core/lonepairs.mjs';import {drawnOrdersAndCharges} from '../src/core/layout2d.mjs';
++import {env,viewerAtoms} from './helpers/library-env.mjs';
++const {LIB,Core,computeBonds}=env;
++// Everything is analysed exactly as the viewer does it: library entry -> atom records -> bonds from geometry -> perceived orders -> orders/charges as drawn -> lone pairs.
++function analyse(id,{dropH=false}={}){let atoms=viewerAtoms(LIB.find(e=>e.id===id));if(dropH)atoms=atoms.filter(a=>a.el!=='H');
++ const bonds=computeBonds(atoms),od=Core.assignBondOrdersDetailed(atoms,bonds),dr=drawnOrdersAndCharges(atoms,bonds,od.orders),lp=computeLonePairs(atoms,bonds,dr.orders,{charges:dr.charge});return{atoms,bonds,lp,dr}}
++const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],len=a=>Math.hypot(...a),unit=a=>{const l=len(a);return a.map(x=>x/l)},cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
++const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,dot(unit(a),unit(b)))))*180/Math.PI,pos=a=>[a.x,a.y,a.z];
++const nbrs=(R,i)=>R.bonds.filter(([a,b])=>a===i||b===i).map(([a,b])=>a===i?b:a),toward=(R,i,j)=>sub(pos(R.atoms[j]),pos(R.atoms[i]));
++const lps=(R,i)=>R.lp.filter(l=>l.atom===i);
++
++test('lone-pair count from valence: water O 2, ammonia N 1, amine N 1, halides 3, ions with their charge; incomplete bonding gives none',()=>{
++ const T=[['O',2,0,2],['O',1,-1,3],['O',3,1,1],/* H3O+ */['N',3,0,1],['N',4,1,0],['N',4,0,0],['N',3.5,0,0],['S',2,0,2],['S',6,0,0],['Cl',1,0,3],['Cl',0,-1,4],['F',1,0,3],['P',3,0,1],['P',5,0,0],['C',0,0,0],['H',1,0,0],['Zn',0,0,0],
++  ['O',1,0,0],['N',1,0,0],['N',2,0,0],['O',0,0,0]];   // the last four: bonding looks incomplete (hydrogens missing), so nothing is guessed
++ for(const[el,sum,q,want]of T)assert.equal(lonePairCount(el,sum,q),want,`${el} bond-order sum ${sum} charge ${q}`)});
++
++// Expected lone pairs per heavy atom, written from chemistry (Lewis structures), NOT derived from the code under test.
++const EXPECT={water:{O:[2]},methane:{},benzene:{},co2:{O:[2,2]},ammonia:{N:[1]},ethene:{},ethyne:{},ethane:{},glycine:{N:[1],O:[2,2]},alanine:{N:[1],O:[2,2]},
++ alanine_h:{O:[2,3]},/* NH3+ has none; C=O 2; O- 3 */ethanol:{O:[2]},acetic:{O:[2,2]},phenol:{O:[2]},toluene:{},aniline:{N:[1]},hcn:{N:[1]},h2s:{S:[2]},co:{C:[1],O:[1]},n2:{N:[1,1]},o2:{O:[2,2]},
++ methanol:{O:[2]},cyclohexane:{},urea:{N:[1,1],O:[2]},acetone:{O:[2]},pyridine:{N:[1]},imidazole:{N:[1]}/* N-H lone pair is in the aromatic pi system: not shown */,serine:{N:[1],O:[2,2,2]},cysteine:{N:[1],O:[2,2],S:[2]},valine:{N:[1],O:[2,2]},formaldehyde:{O:[2]}};
++for(const[id,want]of Object.entries(EXPECT))test(`${id}: lone pairs per atom match the Lewis structure`,()=>{
++ const R=analyse(id),per=new Map();for(const l of R.lp)per.set(l.atom,(per.get(l.atom)||0)+1);const got={};for(const[i,n]of per)(got[R.atoms[i].el]||(got[R.atoms[i].el]=[])).push(n);for(const k in got)got[k].sort();
++ assert.deepEqual(got,Object.fromEntries(Object.entries(want).map(([k,v])=>[k,[...v].sort()])))});
++test('peptide models: every amide / N-terminal N has 1, every carbonyl O 2, the C-terminal acid O and OH 2 each, nothing else: 3n+2 per chain',()=>{
++ for(const e of LIB.filter(x=>x.cat==='Idealised peptide models')){const R=analyse(e.id),per=new Map();for(const l of R.lp)per.set(l.atom,(per.get(l.atom)||0)+1);
++  const chains=new Set(R.atoms.map(a=>a.chain)),n=new Set(R.atoms.map(a=>a.chain+'|'+a.resi)).size;assert.equal(R.lp.length,3*n+2*chains.size,e.id);
++  for(const[i,c]of per){const a=R.atoms[i];assert.ok(a.el==='N'?c===1:a.el==='O'?c===2:false,`${e.id} ${a.name}${a.resi} has ${c}`)}
++  assert.equal([...per.keys()].filter(i=>R.atoms[i].el==='N').length,n,e.id+': one N per residue')}});
++test('B-DNA is schematic (P and X pseudo-atoms): no real atoms, so nothing is derived for it by the viewer',()=>{assert.ok(LIB.find(e=>e.id==='bdna').noH)});
++
++test('water: two lone pairs, tetrahedral with the two O-H bonds (LP-O-H ~109 deg, LP-O-LP ~109 deg), opposite the H atoms',()=>{
++ const R=analyse('water'),L=lps(R,0),[h1,h2]=nbrs(R,0);assert.equal(L.length,2);assert.ok(L.every(l=>l.type==='sp3'));
++ for(const l of L)for(const h of[h1,h2]){const a=ang(l.dir,toward(R,0,h));assert.ok(a>105&&a<118,'LP-O-H '+a)}
++ const aa=ang(L[0].dir,L[1].dir);assert.ok(aa>105&&aa<115,'LP-O-LP '+aa);
++ assert.ok(dot(unit([L[0].dir[0]+L[1].dir[0],L[0].dir[1]+L[1].dir[1],L[0].dir[2]+L[1].dir[2]]),unit([...toward(R,0,h1)].map((x,k)=>x+toward(R,0,h2)[k])))<-.99,'the pair points away from the hydrogens')});
++test('ammonia: one lone pair on the pyramid axis, opposite the three N-H bonds (LP-N-H ~110 deg)',()=>{
++ const R=analyse('ammonia'),L=lps(R,0);assert.equal(L.length,1);const s=nbrs(R,0).map(j=>unit(toward(R,0,j))).reduce((p,q)=>[p[0]+q[0],p[1]+q[1],p[2]+q[2]]);
++ assert.ok(dot(L[0].dir,unit(s))<-.999,'opposite the sum of the bonds');for(const j of nbrs(R,0)){const a=ang(L[0].dir,toward(R,0,j));assert.ok(a>105&&a<118,'LP-N-H '+a)}});
++test('amine N (glycine) and alcohol O (ethanol, methanol) are tetrahedral: every LP-X-substituent angle ~109 deg',()=>{
++ for(const[id,i,n]of[['glycine',0,1],['ethanol',2,2],['methanol',1,2]]){const R=analyse(id),L=lps(R,i);assert.equal(L.length,n,id);for(const l of L){assert.equal(l.type,'sp3');for(const j of nbrs(R,i)){const a=ang(l.dir,toward(R,i,j));assert.ok(a>100&&a<122,`${id} LP-X-subst ${a}`)}}}});
++test('carbonyl O (formaldehyde): two lone pairs in the molecular plane, 120 deg from C=O and from each other',()=>{
++ const R=analyse('formaldehyde'),O=R.atoms.findIndex(a=>a.el==='O'),C=nbrs(R,O)[0],H=nbrs(R,C).find(j=>R.atoms[j].el==='H'),n=unit(cross(toward(R,C,O),toward(R,C,H))),L=lps(R,O);
++ assert.equal(L.length,2);for(const l of L){assert.equal(l.type,'sp2');assert.ok(Math.abs(dot(l.dir,n))<.02,'in the plane');assert.ok(Math.abs(ang(l.dir,toward(R,O,C))-120)<1.5)}assert.ok(Math.abs(ang(L[0].dir,L[1].dir)-120)<2)});
++test('linear atoms: N2, HCN nitrogen and CO point straight away from the bond (180 deg)',()=>{
++ for(const[id,i]of[['n2',0],['n2',1],['hcn',2],['co',0],['co',1]]){const R=analyse(id),L=lps(R,i);assert.equal(L.length,1,id+i);assert.equal(L[0].type,'sp');assert.ok(Math.abs(ang(L[0].dir,toward(R,i,nbrs(R,i)[0]))-180)<.5)}});
++test('lone pair conjugated with a ring (aniline N): ONE lone pair perpendicular to the ring plane (a p lone pair), not tetrahedral',()=>{
++ const R=analyse('aniline'),N=R.atoms.findIndex(a=>a.el==='N'),L=lps(R,N);assert.equal(L.length,1);assert.equal(L[0].type,'p');assert.ok(Math.abs(L[0].dir[2])>.99,'perpendicular to the ring plane (z=0): '+L[0].dir)});
++test('pyridine N: the lone pair lies in the ring plane pointing straight out of the ring (sp2); phenol O: one in the plane, one perpendicular',()=>{
++ let R=analyse('pyridine'),L=lps(R,0);assert.equal(L.length,1);assert.equal(L[0].type,'sp2');assert.ok(Math.abs(L[0].dir[2])<1e-6);assert.ok(dot(L[0].dir,unit(pos(R.atoms[0])))>.99,'radially outward');
++ R=analyse('phenol');const O=R.atoms.findIndex(a=>a.el==='O');L=lps(R,O);assert.deepEqual(L.map(l=>l.type).sort(),['p','sp2']);for(const l of L)assert.ok(l.type==='p'?Math.abs(l.dir[2])>.99:Math.abs(l.dir[2])<1e-6)});
++test('carboxylate (alanine zwitterion): O- shows three (two in the plane + one p), C=O two; NH3+ shows none; neutral COOH shows two on each O',()=>{
++ let R=analyse('alanine_h');const os=R.atoms.map((a,i)=>a.el==='O'?i:-1).filter(i=>i>=0).map(i=>lps(R,i).map(l=>l.type).sort().join('+'));assert.deepEqual(os.sort(),['p+sp2+sp2','sp2+sp2']);
++ assert.equal(lps(R,R.atoms.findIndex(a=>a.el==='N')).length,0,'ammonium N');
++ R=analyse('acetic');for(const i of R.atoms.map((a,k)=>a.el==='O'?k:-1).filter(k=>k>=0))assert.equal(lps(R,i).length,2)});
++test('lone pairs are not atoms: the result holds only {atom,dir,type}, directions are unit vectors, the atom array is untouched',()=>{
++ const atoms=viewerAtoms(LIB.find(e=>e.id==='water')),before=JSON.stringify(atoms),bonds=computeBonds(atoms),orders=Core.assignBondOrdersDetailed(atoms,bonds).orders,lp=computeLonePairs(atoms,bonds,orders);
++ assert.equal(JSON.stringify(atoms),before);assert.equal(atoms.length,3);assert.equal(bonds.length,2);for(const l of lp){assert.deepEqual(Object.keys(l).sort(),['atom','dir','type']);assert.ok(Math.abs(len(l.dir)-1)<1e-9)}});
++test('hydrogens missing from the file: atoms that look short of bonds get NO lone pair (not guessed); complete atoms still do; delocalised atoms are skipped',()=>{
++ const R=analyse('glycine',{dropH:true}),O=R.atoms.map((a,i)=>a.el==='O'?i:-1).filter(i=>i>=0),N=R.atoms.findIndex(a=>a.el==='N');
++ assert.equal(lps(R,N).length,0,'N lost its H: unknown');assert.deepEqual(O.map(i=>lps(R,i).length).sort(),[0,2],'C=O keeps 2; the O-H without H gets none');
++ assert.equal(analyse('pyridine',{dropH:true}).lp.length,0,'ring N could be pyridine-type or N-H without hydrogens');assert.equal(analyse('pyridine').lp.length,1);
++ assert.equal(analyse('water',{dropH:true}).lp.length,0,'a bare O (water without H) is not guessed')});
++test('structures from files (no hydrogens at all, residue orders): backbone carbonyl O still gets 2 lone pairs, backbone N and side-chain OH are left alone',()=>{
++ const R=analyse('pep_alpha',{dropH:true}),perEl={N:0,O:0};for(const l of R.lp)perEl[R.atoms[l.atom].el]++;assert.equal(perEl.N,0,'N-H nitrogens: hydrogens unknown');assert.equal(perEl.O,11*2+2+3,'11 backbone carbonyls x 2, plus the C-terminus read as a carboxylate (C=O 2, O- 3)')});
++test('drawnOrdersAndCharges: a delocalised group with an O-H is a protonated acid (C=O and C-OH); two terminal O is still a carboxylate (C=O and C-O-)',()=>{
++ const at=['C','O','O','H'].map(el=>({el})),acid=drawnOrdersAndCharges(at,[[0,1],[0,2],[2,3]],[1.5,1.5,1]);assert.deepEqual(acid.orders.slice(0,2),[2,1]);assert.equal(acid.charge.size,0);
++ const ox=drawnOrdersAndCharges(['C','O','O'].map(el=>({el})),[[0,1],[0,2]],[1.5,1.5]);assert.deepEqual(ox.orders,[2,1]);assert.equal(ox.charge.get(2),-1)});
+diff --git a/tools/build_viewer.mjs b/tools/build_viewer.mjs
+index 351ff05..ec40466 100644
+--- a/tools/build_viewer.mjs
++++ b/tools/build_viewer.mjs
+@@ -1,5 +1,6 @@
+-// Generates the three files in js/generated/ from src/ (src/ is the single source of truth for this code):
++// Generates the four files in js/generated/ from src/ (src/ is the single source of truth for this code):
+ //   js/generated/hydrogens.js  <- src/core/hydrogens.mjs
++//   js/generated/lonepairs.js  <- src/core/lonepairs.mjs
+ //   js/generated/layout2d.js   <- src/core/layout2d.mjs
+ //   js/generated/labs.js       <- src/labs/*.mjs plus the src/core modules they import
+ // They are written as classic scripts (no ES modules), so index.html also works when it is opened by double-click (file://), not only from a server.
+@@ -16,7 +17,7 @@ export function generate(root=defaultRoot){
+  const rd=p=>fs.readFileSync(path.join(root,p),'utf8').replace(/\r\n/g,'\n');
+  const files={};
+  // one src/core module wrapped as `const Name=(()=>{...return{exports}})();`
+- for(const[name,file,out]of[['Hydrogens','src/core/hydrogens.mjs','js/generated/hydrogens.js'],['Layout2D','src/core/layout2d.mjs','js/generated/layout2d.js']]){
++ for(const[name,file,out]of[['Hydrogens','src/core/hydrogens.mjs','js/generated/hydrogens.js'],['LonePairs','src/core/lonepairs.mjs','js/generated/lonepairs.js'],['Layout2D','src/core/layout2d.mjs','js/generated/layout2d.js']]){
+   const raw=rd(file),src=raw.replace(/^export /gm,''),names=[...raw.matchAll(/^export\s+(?:async\s+)?(?:function\*?|const|let|class)\s+([A-Za-z0-9_$]+)/gm)].map(m=>m[1]);
+   files[out]=banner(file)+'const '+name+'=(()=>{\n'+src+'\nreturn{'+names.join(',')+'}})();\n'}
+  // labs: every module becomes __M['name']=(()=>{...})(); imports between them are rewritten to lookups in __M

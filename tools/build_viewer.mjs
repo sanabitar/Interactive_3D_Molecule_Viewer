@@ -1,5 +1,6 @@
-// Generates the three files in js/generated/ from src/ (src/ is the single source of truth for this code):
+// Generates the four files in js/generated/ from src/ (src/ is the single source of truth for this code):
 //   js/generated/hydrogens.js  <- src/core/hydrogens.mjs
+//   js/generated/lonepairs.js  <- src/core/lonepairs.mjs
 //   js/generated/layout2d.js   <- src/core/layout2d.mjs
 //   js/generated/labs.js       <- src/labs/*.mjs plus the src/core modules they import
 // They are written as classic scripts (no ES modules), so index.html also works when it is opened by double-click (file://), not only from a server.
@@ -16,7 +17,7 @@ export function generate(root=defaultRoot){
  const rd=p=>fs.readFileSync(path.join(root,p),'utf8').replace(/\r\n/g,'\n');
  const files={};
  // one src/core module wrapped as `const Name=(()=>{...return{exports}})();`
- for(const[name,file,out]of[['Hydrogens','src/core/hydrogens.mjs','js/generated/hydrogens.js'],['Layout2D','src/core/layout2d.mjs','js/generated/layout2d.js']]){
+ for(const[name,file,out]of[['Hydrogens','src/core/hydrogens.mjs','js/generated/hydrogens.js'],['LonePairs','src/core/lonepairs.mjs','js/generated/lonepairs.js'],['Layout2D','src/core/layout2d.mjs','js/generated/layout2d.js']]){
   const raw=rd(file),src=raw.replace(/^export /gm,''),names=[...raw.matchAll(/^export\s+(?:async\s+)?(?:function\*?|const|let|class)\s+([A-Za-z0-9_$]+)/gm)].map(m=>m[1]);
   files[out]=banner(file)+'const '+name+'=(()=>{\n'+src+'\nreturn{'+names.join(',')+'}})();\n'}
  // labs: every module becomes __M['name']=(()=>{...})(); imports between them are rewritten to lookups in __M
